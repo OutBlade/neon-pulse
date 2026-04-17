@@ -6,6 +6,10 @@ Charge your pulse drive, aim with the cursor, release to dash through waves of
 hostile drones. Clear arenas, pick upgrades, chase combos. Every run is a
 different build, every build ends in chaos.
 
+[![Download for Windows](https://img.shields.io/badge/Download%20for%20Windows-NeonPulseSetup--0.1.0.exe-ff2a6d?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/OutBlade/neon-pulse/releases/download/v0.1.0/NeonPulseSetup-0.1.0.exe)
+[![Play in Browser](https://img.shields.io/badge/Play%20in%20Browser-outblade.github.io-05d9e8?style=for-the-badge&logo=googlechrome&logoColor=white)](https://outblade.github.io/neon-pulse/)
+[![Release](https://img.shields.io/github/v/release/OutBlade/neon-pulse?style=for-the-badge&color=b967ff)](https://github.com/OutBlade/neon-pulse/releases/latest)
+
 Built as a Steam-ready example using the Claude Code Game Studios framework.
 Ships as a standalone Electron app with its own launcher, settings,
 statistics, and achievements. Also runs directly in the browser.
