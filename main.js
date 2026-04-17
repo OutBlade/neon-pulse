@@ -9,16 +9,35 @@ const path = require('path');
 let mainWindow = null;
 
 // ── Auto-updater configuration ────────────────────────────────────────────────
-autoUpdater.autoDownload    = true;   // download silently in background
-autoUpdater.autoInstallOnAppQuit = true; // install when user quits normally
+// electron-updater reads the `publish` block in package.json and fetches
+// latest.yml from GitHub Releases to detect new versions.
+// No token is required for public repositories.
+autoUpdater.autoDownload         = true;   // download silently in background
+autoUpdater.autoInstallOnAppQuit = true;   // install when user quits normally
+autoUpdater.allowPrerelease      = false;  // stable releases only
+autoUpdater.channel              = 'latest';
+
+autoUpdater.on('checking-for-update', () => {
+  console.log('[updater] Checking for update…');
+});
 
 autoUpdater.on('update-available', (info) => {
+  console.log('[updater] Update available:', info.version);
   if (mainWindow) {
     mainWindow.webContents.send('update-available', { version: info.version });
   }
 });
 
+autoUpdater.on('update-not-available', () => {
+  console.log('[updater] Up to date.');
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  console.log(`[updater] Downloading… ${Math.round(progress.percent)}%`);
+});
+
 autoUpdater.on('update-downloaded', (info) => {
+  console.log('[updater] Update downloaded:', info.version);
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded', { version: info.version });
   }
@@ -26,7 +45,7 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   // Non-fatal — silently ignore update errors so the game still launches
-  console.error('[updater]', err.message);
+  console.error('[updater] Error:', err.message);
 });
 
 // ── Window ────────────────────────────────────────────────────────────────────
