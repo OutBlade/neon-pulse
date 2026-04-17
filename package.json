@@ -1,0 +1,58 @@
+{
+  "name": "neon-pulse",
+  "version": "0.1.0",
+  "description": "A precision dash roguelike set in a neon-drenched void.",
+  "main": "main.js",
+  "author": "OutBlade",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "web": "npx --yes http-server src -p 5173 -o",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.outblade.neonpulse",
+    "productName": "Neon Pulse",
+    "copyright": "Copyright © 2026 OutBlade",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Neon Pulse"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.games",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Game",
+      "icon": "build/icon.png"
+    }
+  }
+}
