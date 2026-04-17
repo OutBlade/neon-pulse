@@ -1,11 +1,35 @@
 // NEON PULSE — Electron main process
-// Creates the borderless game window and wires up fullscreen controls.
+// Creates the borderless game window, wires up fullscreen controls,
+// and manages automatic background updates via electron-updater.
 
-const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 let mainWindow = null;
 
+// ── Auto-updater configuration ────────────────────────────────────────────────
+autoUpdater.autoDownload    = true;   // download silently in background
+autoUpdater.autoInstallOnAppQuit = true; // install when user quits normally
+
+autoUpdater.on('update-available', (info) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', { version: info.version });
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', { version: info.version });
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  // Non-fatal — silently ignore update errors so the game still launches
+  console.error('[updater]', err.message);
+});
+
+// ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -26,44 +50,43 @@ function createWindow() {
     },
   });
 
-  // Hide default menu entirely
   mainWindow.setMenuBarVisibility(false);
-
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    // Check for updates 5 seconds after launch so startup feels instant
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 5000);
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-
-  // IPC bridge: renderer can ask main to toggle fullscreen, quit, etc.
-  ipcMain.handle('app:toggle-fullscreen', () => {
-    if (!mainWindow) return false;
-    const isFull = mainWindow.isFullScreen();
-    mainWindow.setFullScreen(!isFull);
-    return !isFull;
-  });
-
-  ipcMain.handle('app:quit', () => {
-    app.quit();
-  });
-
-  ipcMain.handle('app:minimize', () => {
-    if (mainWindow) mainWindow.minimize();
-  });
-
-  ipcMain.handle('app:version', () => {
-    return app.getVersion();
-  });
 }
 
+// ── IPC handlers ──────────────────────────────────────────────────────────────
+ipcMain.handle('app:toggle-fullscreen', () => {
+  if (!mainWindow) return false;
+  const isFull = mainWindow.isFullScreen();
+  mainWindow.setFullScreen(!isFull);
+  return !isFull;
+});
+
+ipcMain.handle('app:quit',     () => { app.quit(); });
+ipcMain.handle('app:minimize', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.handle('app:version',  () => app.getVersion());
+
+// Renderer requests install: quit and let the downloaded installer run
+ipcMain.handle('app:install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createWindow();
 
-  // F11 → fullscreen toggle, ESC cannot exit fullscreen by default when borderless
   globalShortcut.register('F11', () => {
     if (mainWindow) mainWindow.setFullScreen(!mainWindow.isFullScreen());
   });

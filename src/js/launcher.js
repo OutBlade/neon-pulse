@@ -266,6 +266,18 @@
     versionEl.textContent = 'web build';
   }
 
+  // ─── Auto-update bar ──────────────────────
+  if (window.neon && window.neon.onUpdateReady) {
+    window.neon.onUpdateReady((info) => {
+      const bar     = document.getElementById('update-bar');
+      const barText = document.getElementById('update-bar-text');
+      const barBtn  = document.getElementById('update-bar-btn');
+      barText.innerHTML = `UPDATE READY &nbsp;&mdash;&nbsp; <span>v${info.version}</span> &nbsp;downloaded`;
+      bar.style.display = 'flex';
+      barBtn.onclick = () => window.neon.installUpdate();
+    });
+  }
+
   // ─── Start game ───────────────────────────
   function startGame() {
     document.getElementById('launcher-root').style.display = 'none';

@@ -10,9 +10,13 @@
     "web": "npx --yes http-server src -p 5173 -o",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win --x64"
+    "dist:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^32.0.0",
     "electron-builder": "^25.0.0"
   },
@@ -30,12 +34,20 @@
       "src/**/*",
       "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "OutBlade",
+        "repo": "neon-pulse",
+        "releaseType": "release"
+      }
+    ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        { "target": "nsis", "arch": ["x64"] }
       ],
-      "icon": "build/icon.ico"
+      "signingHashAlgorithms": null,
+      "sign": null
     },
     "nsis": {
       "oneClick": false,

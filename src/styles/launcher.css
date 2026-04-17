@@ -473,3 +473,48 @@ input[type="range"]::-webkit-slider-thumb {
 @keyframes toast-out {
   to { transform: translateX(40px); opacity: 0; }
 }
+
+/* ─── Update bar ──────────────────────────────────────────────────────── */
+#update-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: rgba(10, 4, 23, 0.97);
+  border-top: 1px solid var(--accent);
+  box-shadow: 0 -4px 24px rgba(255, 42, 109, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px 24px;
+  animation: slide-up 0.3s ease;
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+#update-bar-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  color: var(--muted);
+}
+#update-bar-text span {
+  color: var(--cyan);
+  font-weight: 700;
+}
+#update-bar-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+#update-bar-btn:hover {
+  background: #ff5590;
+  box-shadow: 0 0 16px var(--accent-glow);
+}
