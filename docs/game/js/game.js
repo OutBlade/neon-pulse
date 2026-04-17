@@ -295,6 +295,7 @@ function startArena(num) {
     enemyCountRemaining: count,
     kills: 0,
     tookDamage: false,
+    cleared: false,
   };
   if (stats.scavenger && num > 1 && player.lives < 5) player.lives = Math.min(5, player.lives + 1);
   input.dashCharges = stats.maxCharges;
@@ -346,7 +347,16 @@ function onMouseUp(e) {
 }
 function onKeyDown(e) {
   if (e.code === 'Escape' || e.code === 'KeyP') {
+    // Block pause toggle while upgrade or wave-clear screens are active —
+    // otherwise ESC would dismiss paused state without picking an upgrade,
+    // allowing infinite rerolls.
+    if (document.getElementById('upgrade-screen').classList.contains('show')) return;
+    if (document.getElementById('waveclear-screen').classList.contains('show')) return;
     togglePause();
+  } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    if (document.getElementById('waveclear-screen').classList.contains('show')) {
+      continueToUpgrades();
+    }
   } else if (e.code === 'Space') {
     if (paused) return;
     if (input.dashCharges <= 0 || input.dashCdMs > 0) return;
@@ -376,6 +386,7 @@ function bindInputs() {
   document.getElementById('go-retry').addEventListener('click', retryRun);
   document.getElementById('go-share').addEventListener('click', shareScore);
   document.getElementById('go-menu').addEventListener('click', exitToMenu);
+  document.getElementById('wc-continue').addEventListener('click', continueToUpgrades);
 }
 function unbindInputs() {
   canvas.removeEventListener('mousemove', onMouseMove);
@@ -442,6 +453,7 @@ function exitToMenu() {
   document.getElementById('pause-screen').classList.remove('show');
   document.getElementById('gameover-screen').classList.remove('show');
   document.getElementById('upgrade-screen').classList.remove('show');
+  document.getElementById('waveclear-screen').classList.remove('show');
   stop(true);
 }
 function shareScore() {
@@ -565,6 +577,12 @@ function loop(now) {
 }
 
 function update(dt, rawDt) {
+  // dt    = slowmo-aware frame time (drives gameplay physics)
+  // rawDt = real frame time         (drives timers / cooldowns)
+  // dtScale normalises per-frame steps to 60 fps so physics is
+  // frame-rate independent on any monitor refresh rate.
+  const dtScale = dt / 16.6;
+
   // ─── Arena timing / spawning ───
   arena.timeRemainingMs -= rawDt;
   arena.spawnTimer -= rawDt;
@@ -588,19 +606,19 @@ function update(dt, rawDt) {
   }
 
   // Shake decay
-  shake.x *= CFG.SHAKE_DECAY;
-  shake.y *= CFG.SHAKE_DECAY;
+  shake.x *= Math.pow(CFG.SHAKE_DECAY, dtScale);
+  shake.y *= Math.pow(CFG.SHAKE_DECAY, dtScale);
 
   // i-frames
   if (player.iframes > 0) player.iframes -= rawDt;
 
   // ─── Player movement ───
   if (player.dashing) {
-    player.x += player.vx;
-    player.y += player.vy;
-    // overshoot check
+    player.x += player.vx * dtScale;
+    player.y += player.vy * dtScale;
+    // overshoot check — stop when within one step of target
     const remaining = Math.hypot(player.dashTx - player.x, player.dashTy - player.y);
-    if (remaining < CFG.DASH_SPEED) {
+    if (remaining < CFG.DASH_SPEED * dtScale) {
       player.dashing = false;
       if (stats.shockwaveLevel > 0) spawnShockwave(player.x, player.y);
     }
@@ -613,17 +631,16 @@ function update(dt, rawDt) {
       player.vx = (dx / d) * CFG.AUTO_MOVE_SPEED;
       player.vy = (dy / d) * CFG.AUTO_MOVE_SPEED;
     } else {
-      player.vx *= CFG.FRICTION;
-      player.vy *= CFG.FRICTION;
+      player.vx *= Math.pow(CFG.FRICTION, dtScale);
+      player.vy *= Math.pow(CFG.FRICTION, dtScale);
     }
-    player.x += player.vx;
-    player.y += player.vy;
+    player.x += player.vx * dtScale;
+    player.y += player.vy * dtScale;
   }
 
-  // Clamp to canvas
+  // Clamp to arena circle
   const cx = W / 2, cy = H / 2;
   const arenaR = Math.min(W, H) * CFG.ARENA_RADIUS_FACTOR;
-  // soft clamp to arena circle
   const pdx = player.x - cx, pdy = player.y - cy;
   const pd = Math.hypot(pdx, pdy);
   if (pd > arenaR - player.radius) {
@@ -636,11 +653,11 @@ function update(dt, rawDt) {
   // ─── Phantoms ───
   for (let i = phantomDashes.length - 1; i >= 0; i--) {
     const p = phantomDashes[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life -= 0.04;
+    p.x += p.vx * dtScale;
+    p.y += p.vy * dtScale;
+    p.life -= 0.04 * dtScale;
     const rem = Math.hypot(p.tx - p.x, p.ty - p.y);
-    if (rem < CFG.DASH_SPEED || p.life <= 0) phantomDashes.splice(i, 1);
+    if (rem < CFG.DASH_SPEED * dtScale || p.life <= 0) phantomDashes.splice(i, 1);
     else {
       // damage enemies in path
       for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -660,8 +677,8 @@ function update(dt, rawDt) {
     if (e.type === 'shooter') {
       // stop at a distance and shoot
       if (d > CFG.SHOOTER_STOP_DIST) {
-        e.x += nx * e.speed;
-        e.y += ny * e.speed;
+        e.x += nx * e.speed * dtScale;
+        e.y += ny * e.speed * dtScale;
       }
       e.fireTimer -= rawDt;
       if (e.fireTimer <= 0) {
@@ -678,7 +695,7 @@ function update(dt, rawDt) {
       // Slow orbit around arena center, rotate phases
       const cxB = W / 2, cyB = H / 2;
       const dxB = e.x - cxB, dyB = e.y - cyB;
-      const angB = Math.atan2(dyB, dxB) + 0.006 * e.speed;
+      const angB = Math.atan2(dyB, dxB) + 0.006 * e.speed * dtScale;
       const rad  = 180;
       e.x = cxB + Math.cos(angB) * rad;
       e.y = cyB + Math.sin(angB) * rad;
@@ -724,8 +741,8 @@ function update(dt, rawDt) {
         }
       }
     } else {
-      e.x += nx * e.speed;
-      e.y += ny * e.speed;
+      e.x += nx * e.speed * dtScale;
+      e.y += ny * e.speed * dtScale;
     }
 
     // Dash collision
@@ -748,7 +765,7 @@ function update(dt, rawDt) {
   // ─── Projectiles ───
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
-    p.x += p.vx; p.y += p.vy;
+    p.x += p.vx * dtScale; p.y += p.vy * dtScale;
     p.life -= rawDt;
     if (p.life <= 0 || p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) {
       projectiles.splice(i, 1);
@@ -775,12 +792,12 @@ function update(dt, rawDt) {
     const d = Math.hypot(dx, dy) || 1;
     const magnetR = 80 * stats.magnetMult;
     if (d < magnetR) {
-      const s = 0.12 + (1 - d / magnetR) * 0.4;
-      o.vx += (dx / d) * s;
-      o.vy += (dy / d) * s;
+      const pull = 0.12 + (1 - d / magnetR) * 0.4;
+      o.vx += (dx / d) * pull * dtScale;
+      o.vy += (dy / d) * pull * dtScale;
     }
-    o.vx *= 0.94; o.vy *= 0.94;
-    o.x += o.vx; o.y += o.vy;
+    o.vx *= Math.pow(0.94, dtScale); o.vy *= Math.pow(0.94, dtScale);
+    o.x += o.vx * dtScale; o.y += o.vy * dtScale;
     o.life -= rawDt;
     if (d < player.radius + 6) {
       addScore(o.value);
@@ -794,33 +811,33 @@ function update(dt, rawDt) {
   // ─── Damage numbers ───
   for (let i = damageNumbers.length - 1; i >= 0; i--) {
     const d = damageNumbers[i];
-    d.y += d.vy;
-    d.vy *= 0.96;
-    d.life -= 0.018;
+    d.y += d.vy * dtScale;
+    d.vy *= Math.pow(0.96, dtScale);
+    d.life -= 0.018 * dtScale;
     if (d.life <= 0) damageNumbers.splice(i, 1);
   }
 
   // ─── Particles ───
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vx *= 0.95; p.vy *= 0.95;
-    p.life -= p.decay * (rawDt / 16.6);
+    p.x += p.vx * dtScale;
+    p.y += p.vy * dtScale;
+    p.vx *= Math.pow(0.95, dtScale); p.vy *= Math.pow(0.95, dtScale);
+    p.life -= p.decay * dtScale;
     if (p.life <= 0) particles.splice(i, 1);
   }
 
   // ─── Shockwaves ───
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const s = shockwaves[i];
-    s.r += s.speed;
+    s.r += s.speed * dtScale;
     s.life -= rawDt;
-    // damage enemies entering the ring
+    // damage enemies entering the expanding ring
     for (let ei = enemies.length - 1; ei >= 0; ei--) {
       const e = enemies[ei];
       const d = dist(s, e);
       if (!s.hit) s.hit = new Set();
-      if (d < s.r + e.radius && d > s.r - 20 - e.radius && !s.hit.has(e)) {
+      if (d < s.r + e.radius && d > s.r - 12 - e.radius && !s.hit.has(e)) {
         s.hit.add(e);
         killEnemy(ei, { source: 'shockwave' });
       }
@@ -829,10 +846,14 @@ function update(dt, rawDt) {
   }
 
   // ─── Arena clear? ───
-  if (arena.isBoss) {
-    if (enemies.length === 0) clearArena();
-  } else if (arena.timeRemainingMs <= 0 && enemies.length === 0 && arena.enemyCountRemaining <= 0) {
-    clearArena();
+  // Show the wave-clear prompt as soon as all enemies are gone.
+  // The player picks the moment to advance rather than waiting on the timer.
+  if (!arena.cleared) {
+    if (arena.isBoss) {
+      if (enemies.length === 0) showWaveClear();
+    } else if (enemies.length === 0 && arena.enemyCountRemaining <= 0) {
+      showWaveClear();
+    }
   }
 
   updateHUD();
@@ -844,7 +865,7 @@ function spawnShockwave(x, y) {
   shockwaves.push({
     x, y,
     r: 0,
-    speed: 9 + stats.shockwaveLevel * 2,
+    speed: 5 + stats.shockwaveLevel * 1.5,
     life: 600,
   });
 }
@@ -975,6 +996,19 @@ function hitPlayer() {
 // ─────────────────────────────────────────────────────
 // ARENA CLEAR / UPGRADES
 // ─────────────────────────────────────────────────────
+function showWaveClear() {
+  arena.cleared = true;
+  const el = document.getElementById('waveclear-screen');
+  document.getElementById('wc-arena-num').textContent = 'ARENA ' + String(arena.num).padStart(2, '0') + ' CLEAR';
+  el.classList.add('show');
+  if (NEON.audio) NEON.audio.menuMove();
+}
+
+function continueToUpgrades() {
+  document.getElementById('waveclear-screen').classList.remove('show');
+  clearArena();
+}
+
 function clearArena() {
   addScore(CFG.ARENA_CLEAR_BONUS + arena.num * 50);
   NEON.achievements.checkOnArenaClear({ arenaNum: arena.num, perfectArena: !arena.tookDamage });

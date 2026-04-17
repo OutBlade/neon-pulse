@@ -1,6 +1,6 @@
 {
   "name": "neon-pulse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A precision dash roguelike set in a neon-drenched void.",
   "main": "main.js",
   "author": "OutBlade",
@@ -46,11 +46,14 @@
       "target": [
         { "target": "nsis", "arch": ["x64"] }
       ],
+      "artifactName": "NeonPulseSetup-${version}.exe",
       "signingHashAlgorithms": null,
       "sign": null
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,

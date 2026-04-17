@@ -450,6 +450,20 @@
       letter-spacing: 0.1em;
       line-height: 1.9;
     }
+    .smartscreen-note {
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: #7a6040;
+      border: 1px solid #3a2a10;
+      background: rgba(60, 35, 5, 0.25);
+      padding: 10px 16px;
+      line-height: 1.8;
+      letter-spacing: 0.05em;
+      text-align: left;
+      max-width: 480px;
+    }
+    .smartscreen-note strong { color: #c89040; }
 
     /* ── CONTROLS ── */
     .controls { padding: 80px 0; }
@@ -708,10 +722,15 @@
         <div class="download-os">Windows x64</div>
         <div class="download-title">Neon Pulse</div>
         <div class="download-sub">Electron · NSIS Installer · v0.1.0</div>
-        <a class="btn btn-primary" id="dl-btn" href="https://github.com/OutBlade/neon-pulse/releases/download/v0.1.0/NeonPulseSetup-0.1.0.exe" target="_blank" rel="noopener">Download Installer</a>
+        <a class="btn btn-primary" id="dl-btn" href="https://github.com/OutBlade/neon-pulse/releases/download/v0.2.0/NeonPulseSetup-0.2.0.exe" target="_blank" rel="noopener">Download Installer v0.2.0</a>
         <div class="download-note">
-          Runs the setup wizard · creates desktop &amp; Start Menu shortcuts<br>
-          The game launcher auto-updates when new versions are released
+          Runs the setup wizard &middot; installs to your user profile &middot; no admin required<br>
+          The launcher <strong>auto-updates silently</strong> when new versions are released
+        </div>
+        <div class="smartscreen-note">
+          Windows SmartScreen may warn &ldquo;Unknown publisher&rdquo; &mdash;
+          click <strong>More info</strong> then <strong>Run anyway</strong>.
+          The file is safe; the warning appears because the binary is unsigned.
         </div>
       </div>
     </section>

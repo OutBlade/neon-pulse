@@ -16,6 +16,9 @@ autoUpdater.autoDownload         = true;   // download silently in background
 autoUpdater.autoInstallOnAppQuit = true;   // install when user quits normally
 autoUpdater.allowPrerelease      = false;  // stable releases only
 autoUpdater.channel              = 'latest';
+// Unsigned builds: skip Windows Authenticode signature check on the
+// downloaded installer and rely solely on the sha512 hash in latest.yml.
+autoUpdater.verifyUpdateCodeSignature = false;
 
 autoUpdater.on('checking-for-update', () => {
   console.log('[updater] Checking for update…');

@@ -188,6 +188,52 @@
   text-transform: uppercase;
 }
 
+/* ── Wave clear prompt ─────────────────────── */
+#waveclear-screen {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(5, 2, 10, 0.92);
+  border: 1px solid var(--cyan);
+  padding: 24px 48px;
+  text-align: center;
+  box-shadow: 0 0 30px var(--cyan-glow), inset 0 0 20px rgba(5, 217, 232, 0.04);
+}
+#waveclear-screen.show {
+  display: flex;
+  animation: wc-slide 0.35s cubic-bezier(0.2, 0, 0.2, 1);
+}
+@keyframes wc-slide {
+  from { transform: translateX(-50%) translateY(16px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+}
+.wc-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5em;
+  color: var(--cyan);
+  text-transform: uppercase;
+}
+.wc-arena {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--ink);
+  text-shadow: 0 0 18px var(--cyan-glow);
+}
+.wc-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
 /* ── Upgrade screen ────────────────────────── */
 #upgrade-screen {
   position: fixed;
