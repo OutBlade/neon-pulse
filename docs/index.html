@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NEON PULSE — Precision Dash Roguelike</title>
+  <meta name="description" content="A precision-dash roguelike set in a neon-drenched void. Charge, aim, release. Chain kills, pick upgrades, survive the apex signal.">
+  <meta property="og:title" content="NEON PULSE">
+  <meta property="og:description" content="A precision-dash roguelike. Charge your pulse drive, dash through waves of hostile drones.">
+  <meta property="og:type" content="website">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #05020a;
+      --bg1:      #0a0514;
+      --accent:   #ff2a6d;
+      --cyan:     #05d9e8;
+      --violet:   #b967ff;
+      --ink:      #e0dff5;
+      --muted:    #5a5870;
+      --dim:      #2e2b40;
+      --font:     'Rajdhani', sans-serif;
+      --mono:     'Share Tech Mono', monospace;
+      --glow-a:   0 0 18px #ff2a6d88, 0 0 40px #ff2a6d33;
+      --glow-c:   0 0 18px #05d9e888, 0 0 40px #05d9e833;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Canvas background ── */
+    #bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    /* ── Scanlines ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+      );
+    }
+
+    /* ── Layout ── */
+    main { position: relative; z-index: 2; }
+
+    section { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 32px;
+      background: rgba(5,2,10,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--dim);
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.4em;
+      color: var(--cyan);
+      text-shadow: var(--glow-c);
+    }
+
+    .nav-links { display: flex; gap: 28px; }
+
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--ink); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      position: relative;
+    }
+
+    .hero-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.5em;
+      color: var(--muted);
+      margin-bottom: 28px;
+      text-transform: uppercase;
+    }
+
+    .hero-title {
+      font-size: clamp(64px, 12vw, 128px);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      line-height: 1;
+      background: linear-gradient(135deg, #fff 0%, var(--cyan) 45%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .hero-title::before {
+      content: attr(data-text);
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 0%, var(--accent) 45%, transparent 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: glitch 6s infinite;
+      opacity: 0;
+    }
+
+    @keyframes glitch {
+      0%, 90%, 100% { opacity: 0; transform: translate(0); }
+      92%            { opacity: 0.7; transform: translate(-3px, 1px); }
+      94%            { opacity: 0.7; transform: translate(3px, -1px); }
+      96%            { opacity: 0; }
+    }
+
+    .hero-tagline {
+      font-family: var(--mono);
+      font-size: 14px;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      margin-bottom: 56px;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.3em;
+      text-decoration: none;
+      text-transform: uppercase;
+      padding: 14px 32px;
+      border: 1px solid currentColor;
+      transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s;
+      cursor: pointer;
+    }
+
+    .btn:hover { transform: translateY(-2px); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: var(--glow-a);
+    }
+
+    .btn-primary:hover {
+      background: #ff5590;
+      box-shadow: 0 0 28px #ff2a6dbb, 0 0 60px #ff2a6d44;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(5,217,232,0.08);
+      box-shadow: var(--glow-c);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border-color: var(--dim);
+    }
+
+    .btn-ghost:hover {
+      color: var(--ink);
+      border-color: var(--muted);
+    }
+
+    /* ── Scroll indicator ── */
+    .scroll-hint {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.4em;
+      color: var(--muted);
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50%       { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── GAME PREVIEW ── */
+    .preview {
+      padding: 80px 0;
+      text-align: center;
+    }
+
+    .game-frame-wrap {
+      position: relative;
+      display: inline-block;
+      margin: 48px auto 0;
+    }
+
+    .game-frame-border {
+      position: absolute; inset: -2px;
+      background: linear-gradient(135deg, var(--accent), var(--cyan), var(--violet));
+      border-radius: 4px;
+      z-index: 0;
+    }
+
+    .game-frame {
+      position: relative; z-index: 1;
+      width: min(860px, calc(100vw - 48px));
+      aspect-ratio: 16/10;
+      background: var(--bg);
+      border-radius: 3px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .game-frame iframe {
+      width: 100%; height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .game-frame-overlay {
+      position: absolute; inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5,2,10,0.9);
+      cursor: pointer;
+      transition: opacity 0.3s;
+      z-index: 10;
+    }
+
+    .game-frame-overlay.hidden { display: none; }
+
+    .play-icon {
+      width: 72px; height: 72px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      color: var(--accent);
+      margin-bottom: 20px;
+      box-shadow: var(--glow-a);
+      transition: transform 0.18s;
+    }
+
+    .game-frame-overlay:hover .play-icon { transform: scale(1.12); }
+
+    .play-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      color: var(--muted);
+    }
+
+    /* ── FEATURES ── */
+    .features { padding: 80px 0; }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.5em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--ink);
+      margin-bottom: 48px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1px;
+      background: var(--dim);
+      border: 1px solid var(--dim);
+    }
+
+    .feature-card {
+      background: var(--bg1);
+      padding: 32px 28px;
+      transition: background 0.2s;
+    }
+
+    .feature-card:hover { background: #0e0820; }
+
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .feature-name {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--ink);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .feature-desc {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    /* ── UPGRADES ── */
+    .upgrades { padding: 80px 0; }
+
+    .rarity-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    @media (max-width: 600px) { .rarity-grid { grid-template-columns: 1fr; } }
+
+    .rarity-col { display: flex; flex-direction: column; gap: 10px; }
+
+    .rarity-header {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.4em;
+      padding: 8px 14px;
+      border-left: 3px solid currentColor;
+      margin-bottom: 4px;
+    }
+
+    .rarity-header.common  { color: #8de8c8; border-color: #8de8c8; }
+    .rarity-header.rare    { color: var(--cyan); border-color: var(--cyan); }
+    .rarity-header.legend  { color: var(--accent); border-color: var(--accent); }
+
+    .upgrade-pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      background: var(--bg1);
+      border: 1px solid var(--dim);
+      padding: 8px 14px;
+    }
+
+    /* ── DOWNLOAD ── */
+    .download {
+      padding: 100px 0;
+      text-align: center;
+    }
+
+    .download-box {
+      display: inline-block;
+      border: 1px solid var(--dim);
+      padding: 52px 64px;
+      background: var(--bg1);
+      position: relative;
+      overflow: hidden;
+      max-width: 560px;
+      width: 100%;
+    }
+
+    .download-box::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
+    }
+
+    .download-os {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.4em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .download-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .download-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 36px;
+    }
+
+    .download-note {
+      margin-top: 20px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      line-height: 1.9;
+    }
+
+    /* ── CONTROLS ── */
+    .controls { padding: 80px 0; }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1px;
+      background: var(--dim);
+      border: 1px solid var(--dim);
+      margin-top: 48px;
+    }
+
+    .control-row {
+      background: var(--bg1);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 18px 24px;
+    }
+
+    .key {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--cyan);
+      background: rgba(5,217,232,0.08);
+      border: 1px solid rgba(5,217,232,0.25);
+      padding: 4px 10px;
+      white-space: nowrap;
+      min-width: 110px;
+      text-align: center;
+    }
+
+    .control-desc {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--dim);
+      padding: 40px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      position: relative; z-index: 2;
+    }
+
+    .footer-brand {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+    }
+
+    .footer-links { display: flex; gap: 20px; }
+
+    .footer-links a {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.18s;
+    }
+
+    .footer-links a:hover { color: var(--cyan); }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--dim), transparent);
+      margin: 0 24px;
+      position: relative; z-index: 2;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<nav>
+  <span class="nav-logo">NEON PULSE</span>
+  <div class="nav-links">
+    <a href="#play">Play</a>
+    <a href="#features">Features</a>
+    <a href="#download">Download</a>
+    <a href="https://github.com/OutBlade/neon-pulse" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- HERO -->
+  <div class="hero">
+    <section>
+      <div class="hero-label">Precision Dash Roguelike</div>
+      <h1 class="hero-title" data-text="NEON PULSE">NEON PULSE</h1>
+      <p class="hero-tagline">Charge your pulse drive. Aim. Release.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#download">Download for Windows</a>
+        <a class="btn btn-secondary" href="#play">Play in Browser</a>
+        <a class="btn btn-ghost" href="https://github.com/OutBlade/neon-pulse" target="_blank" rel="noopener">View Source</a>
+      </div>
+    </section>
+    <div class="scroll-hint">SCROLL</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- PLAY IN BROWSER -->
+  <div class="preview" id="play">
+    <section>
+      <div class="section-label">Browser Version</div>
+      <h2 class="section-title">Play Now — No Install Required</h2>
+      <div class="game-frame-wrap">
+        <div class="game-frame-border"></div>
+        <div class="game-frame">
+          <iframe id="game-iframe" src="" title="Neon Pulse" allow="autoplay" style="display:none"></iframe>
+          <div class="game-frame-overlay" id="game-overlay" onclick="launchGame()">
+            <div class="play-icon">&#9654;</div>
+            <div class="play-label">Click to Launch</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- FEATURES -->
+  <div class="features" id="features">
+    <section>
+      <div class="section-label">What's Inside</div>
+      <h2 class="section-title">Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--accent)">&#9670;</span>
+          <div class="feature-name">Precision Dash Combat</div>
+          <div class="feature-desc">Hold to charge, release to dash. Longer charge equals longer dash. Destroy every enemy and projectile in your path.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--cyan)">&#9650;</span>
+          <div class="feature-name">15 Roguelike Upgrades</div>
+          <div class="feature-desc">Three rarity tiers — Common, Rare, Legendary. Every arena clear offers a choice that reshapes your build.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--violet)">&#11044;</span>
+          <div class="feature-name">Boss Arenas</div>
+          <div class="feature-desc">Every 5th arena is an Apex Signal encounter. Three attack phases, scaling with depth. Pattern recognition rewarded.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--accent)">&#9834;</span>
+          <div class="feature-name">Procedural Audio</div>
+          <div class="feature-desc">Zero audio files. Every sound is synthesized in real time via Web Audio API. Works offline, loads instantly.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--cyan)">&#9733;</span>
+          <div class="feature-name">15 Achievements</div>
+          <div class="feature-desc">Persistent across runs. Unlocking requires genuine skill — hit x25 combo, clear arena 10, land 1000 kills.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon" style="color:var(--violet)">&#9881;</span>
+          <div class="feature-name">Full Game Launcher</div>
+          <div class="feature-desc">Main menu, settings, statistics, achievements, and credits. All wrapped in an Electron desktop app with its own window chrome.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- UPGRADES -->
+  <div class="upgrades">
+    <section>
+      <div class="section-label">Roguelike System</div>
+      <h2 class="section-title">Upgrades</h2>
+      <div class="rarity-grid">
+        <div class="rarity-col">
+          <div class="rarity-header common">Common · 70%</div>
+          <div class="upgrade-pill">Extended Arc</div>
+          <div class="upgrade-pill">Quick Recovery</div>
+          <div class="upgrade-pill">Rapid Charge</div>
+          <div class="upgrade-pill">Wider Pulse</div>
+          <div class="upgrade-pill">Momentum</div>
+        </div>
+        <div class="rarity-col">
+          <div class="rarity-header rare">Rare · 25%</div>
+          <div class="upgrade-pill">Shockwave</div>
+          <div class="upgrade-pill">Piercing Pulse</div>
+          <div class="upgrade-pill">Second Wind</div>
+          <div class="upgrade-pill">Temporal Field</div>
+          <div class="upgrade-pill">Magnetic Field</div>
+        </div>
+        <div class="rarity-col">
+          <div class="rarity-header legend">Legendary · 5%</div>
+          <div class="upgrade-pill">Overdrive</div>
+          <div class="upgrade-pill">Echo</div>
+          <div class="upgrade-pill">Ghost Protocol</div>
+          <div class="upgrade-pill">Scavenger</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <section>
+      <div class="section-label">How to Play</div>
+      <h2 class="section-title">Controls</h2>
+      <div class="controls-grid">
+        <div class="control-row">
+          <span class="key">Mouse Move</span>
+          <span class="control-desc">Aim your dash</span>
+        </div>
+        <div class="control-row">
+          <span class="key">Hold LMB</span>
+          <span class="control-desc">Charge pulse drive</span>
+        </div>
+        <div class="control-row">
+          <span class="key">Release LMB</span>
+          <span class="control-desc">Execute dash</span>
+        </div>
+        <div class="control-row">
+          <span class="key">Space</span>
+          <span class="control-desc">Alternate dash key</span>
+        </div>
+        <div class="control-row">
+          <span class="key">Esc / P</span>
+          <span class="control-desc">Pause</span>
+        </div>
+        <div class="control-row">
+          <span class="key">F11</span>
+          <span class="control-desc">Fullscreen (desktop)</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- DOWNLOAD -->
+  <div class="download" id="download">
+    <section>
+      <div class="section-label">Desktop App</div>
+      <h2 class="section-title">Download</h2>
+      <div class="download-box">
+        <div class="download-os">Windows x64</div>
+        <div class="download-title">Neon Pulse</div>
+        <div class="download-sub">Electron · Standalone Executable</div>
+        <a class="btn btn-primary" id="dl-btn" href="https://github.com/OutBlade/neon-pulse/releases/latest" target="_blank" rel="noopener">Download v0.1.0</a>
+        <div class="download-note">
+          No installer. Extract and run Neon Pulse.exe<br>
+          Saves stored locally in your user profile
+        </div>
+      </div>
+    </section>
+  </div>
+
+</main>
+
+<footer>
+  <span class="footer-brand">NEON PULSE · MADE WITH PRECISION · 2026</span>
+  <div class="footer-links">
+    <a href="https://github.com/OutBlade/neon-pulse" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/OutBlade/neon-pulse/releases" target="_blank" rel="noopener">Releases</a>
+    <a href="https://github.com/OutBlade/neon-pulse/issues" target="_blank" rel="noopener">Issues</a>
+  </div>
+</footer>
+
+<script>
+  /* ── Animated background canvas ── */
+  (function() {
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [], gridOffset = 0;
+
+    function resize() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+
+    function initParticles() {
+      particles = [];
+      const n = Math.min(60, Math.floor(W * H / 18000));
+      for (let i = 0; i < n; i++) {
+        particles.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.15,
+          vy: (Math.random() - 0.5) * 0.15,
+          r: Math.random() * 1.2 + 0.3,
+          a: Math.random(),
+          col: Math.random() < 0.5 ? '#05d9e8' : '#b967ff',
+        });
+      }
+    }
+
+    let t = 0;
+    function draw() {
+      t += 0.5;
+      gridOffset = (gridOffset + 0.3) % 60;
+
+      ctx.clearRect(0, 0, W, H);
+
+      /* radial gradient */
+      const g = ctx.createRadialGradient(W/2, H*0.4, 0, W/2, H*0.4, W*0.7);
+      g.addColorStop(0,   'rgba(90,20,120,0.18)');
+      g.addColorStop(0.5, 'rgba(5,10,30,0.12)');
+      g.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      /* grid */
+      ctx.strokeStyle = 'rgba(80,60,120,0.06)';
+      ctx.lineWidth = 1;
+      for (let x = (gridOffset % 60); x < W; x += 60) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = (gridOffset % 60); y < H; y += 60) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      /* horizon wave */
+      ctx.strokeStyle = 'rgba(5,217,232,0.07)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 4) {
+        const y = H * 0.55 + Math.sin((x / W) * Math.PI * 4 + t * 0.015) * 28;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      /* particles */
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+        if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+        p.a += 0.005;
+        ctx.globalAlpha = 0.4 + 0.3 * Math.sin(p.a);
+        ctx.fillStyle = p.col;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', () => { resize(); initParticles(); });
+    resize(); initParticles(); draw();
+  })();
+
+  /* ── Launch game in iframe ── */
+  function launchGame() {
+    const overlay = document.getElementById('game-overlay');
+    const iframe  = document.getElementById('game-iframe');
+    overlay.classList.add('hidden');
+    iframe.src = 'game/index.html';
+    iframe.style.display = 'block';
+    // scroll into view so it's fully visible
+    iframe.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NEON PULSE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <link rel="stylesheet" href="styles/launcher.css">
+  <link rel="stylesheet" href="styles/game.css">
+</head>
+<body>
+
+<!-- ─── Electron window chrome ─── -->
+<div id="drag-region"></div>
+<div id="window-controls">
+  <button class="win-btn"        id="win-min"   title="Minimise">—</button>
+  <button class="win-btn"        id="win-full"  title="Fullscreen (F11)">⛶</button>
+  <button class="win-btn close"  id="win-close" title="Quit">✕</button>
+</div>
+
+<!-- ─── Background FX ─── -->
+<canvas id="bg-canvas"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+
+<!-- ─── Launcher root ─── -->
+<div id="launcher-root">
+  <div id="screens">
+
+    <!-- Main menu -->
+    <section class="screen" id="screen-menu">
+      <div class="title-wrap">
+        <h1 class="title" data-text="NEON PULSE"><span class="split">NEON PULSE</span></h1>
+        <p class="tagline">A precision dash roguelike</p>
+      </div>
+      <nav class="menu">
+        <button class="menu-btn primary" id="btn-play">PLAY</button>
+        <button class="menu-btn"         id="btn-settings">SETTINGS</button>
+        <button class="menu-btn"         id="btn-stats">STATS</button>
+        <button class="menu-btn"         id="btn-achievements">ACHIEVEMENTS</button>
+        <button class="menu-btn"         id="btn-credits">CREDITS</button>
+        <button class="menu-btn"         id="btn-quit">QUIT</button>
+      </nav>
+    </section>
+
+    <!-- Settings -->
+    <section class="screen" id="screen-settings">
+      <div class="panel">
+        <h2>SETTINGS</h2>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Master Volume</div>
+            <div class="setting-hint">Affects all sounds and music</div>
+          </div>
+          <div class="setting-control">
+            <input type="range" id="set-volume" min="0" max="100" step="1">
+            <div class="slider-value" id="set-volume-val">70</div>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Sound Effects</div>
+            <div class="setting-hint">Enable gameplay SFX</div>
+          </div>
+          <div class="toggle" id="tog-sfx"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Screen Shake</div>
+            <div class="setting-hint">Camera shake on hits and explosions</div>
+          </div>
+          <div class="toggle" id="tog-shake"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Chromatic Aberration</div>
+            <div class="setting-hint">RGB separation on motion</div>
+          </div>
+          <div class="toggle" id="tog-chroma"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Particles</div>
+            <div class="setting-hint">Reduce for weaker hardware</div>
+          </div>
+          <div class="toggle" id="tog-parts"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">CRT Scanlines</div>
+            <div class="setting-hint">Retro display filter</div>
+          </div>
+          <div class="toggle" id="tog-crt"></div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn-ghost" id="btn-reset-save">RESET SAVE</button>
+          <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="screen" id="screen-stats">
+      <div class="panel">
+        <h2>STATISTICS</h2>
+        <div class="stats-grid">
+          <div class="stat-card hi">
+            <div class="stat-card-label">Best Score</div>
+            <div class="stat-card-value" id="st-best-score">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Best Combo</div>
+            <div class="stat-card-value" id="st-best-combo">x0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Best Arena</div>
+            <div class="stat-card-value" id="st-best-arena">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Runs</div>
+            <div class="stat-card-value" id="st-runs">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Kills</div>
+            <div class="stat-card-value" id="st-kills">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Total Dashes</div>
+            <div class="stat-card-value" id="st-dashes">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Playtime</div>
+            <div class="stat-card-value" id="st-time">0m 0s</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Kills / Run</div>
+            <div class="stat-card-value" id="st-kpr">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Achievements</div>
+            <div class="stat-card-value" id="st-ach">0 / 0</div>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Achievements -->
+    <section class="screen" id="screen-achievements">
+      <div class="panel">
+        <h2>ACHIEVEMENTS · <span id="ach-progress" style="color:var(--accent)">0%</span></h2>
+        <div id="ach-list"></div>
+        <div class="panel-footer">
+          <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Credits -->
+    <section class="screen" id="screen-credits">
+      <div class="panel" style="text-align:center">
+        <h2>CREDITS</h2>
+        <div style="font-size:13px; letter-spacing:0.2em; line-height:2.2; color: var(--ink); padding: 20px 0">
+          NEON PULSE<br>
+          <span style="font-family:var(--font-mono); font-size:10px; color: var(--muted); letter-spacing:0.3em">
+            DESIGN · CODE · AUDIO<br>
+          </span>
+          <span style="color: var(--cyan); font-size: 18px; font-weight: 700">OutBlade</span><br><br>
+          <span style="font-family:var(--font-mono); font-size:10px; color: var(--muted); letter-spacing:0.2em; line-height:1.8">
+            Built with the Claude Code Game Studios framework<br>
+            Rendered in HTML5 Canvas · Audio via Web Audio API<br>
+            Packaged with Electron
+          </span>
+          <br><br>
+          <span style="font-family:var(--font-mono); font-size:10px; color: var(--dim); letter-spacing:0.3em">
+            MADE WITH PRECISION · 2026
+          </span>
+        </div>
+        <div class="panel-footer" style="justify-content:center">
+          <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Launcher footer -->
+  <div class="launcher-footer">
+    <span>NEON PULSE</span>
+    <span id="version-tag">v0.1.0</span>
+  </div>
+</div>
+
+<!-- ─── Game root (hidden until play) ─── -->
+<div id="game-root" style="display:none">
+  <canvas id="game-canvas"></canvas>
+
+  <div id="damage-vignette"></div>
+  <div id="heal-flash"></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-side left">
+        <span class="hud-mini-label">Lives</span>
+        <span class="hud-mini-value" id="hud-lives">◆◆◆</span>
+      </div>
+      <div class="score-display">
+        <div class="score-value" id="hud-score">0</div>
+        <div class="score-sub">ARENA <span id="hud-arena">1</span> · <span id="hud-kills">0</span> KILLS</div>
+      </div>
+      <div class="hud-side right">
+        <span class="hud-mini-label">Time</span>
+        <span class="hud-mini-value" id="hud-time">00:00</span>
+      </div>
+    </div>
+
+    <div class="combo-box hidden" id="combo-box">
+      <div class="combo-value" id="combo-val">x2</div>
+      <div class="combo-label">COMBO</div>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="modifier-bar" id="modifier-bar"></div>
+    </div>
+  </div>
+
+  <div class="announce" id="announce">
+    <div class="a-label">ARENA</div>
+    <div class="a-name" id="announce-name">01</div>
+    <div class="a-sub" id="announce-sub">NEON VOID</div>
+  </div>
+
+  <div id="upgrade-screen">
+    <div class="upgrade-title">ARENA CLEARED</div>
+    <div class="upgrade-headline">CHOOSE YOUR UPGRADE</div>
+    <div class="upgrade-cards" id="upgrade-cards"></div>
+  </div>
+
+  <div id="gameover-screen">
+    <div class="go-title">OFFLINE</div>
+    <div class="go-new-best" id="go-new-best">★ NEW PERSONAL BEST ★</div>
+    <div class="go-stats">
+      <div class="go-stat">
+        <div class="go-stat-label">Score</div>
+        <div class="go-stat-value" style="color:var(--ink)" id="go-score">0</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Arena</div>
+        <div class="go-stat-value" style="color:var(--cyan)" id="go-arena">0</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Max Combo</div>
+        <div class="go-stat-value" style="color:var(--accent)" id="go-combo">x0</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Kills</div>
+        <div class="go-stat-value" style="color:var(--ink)" id="go-kills">0</div>
+      </div>
+    </div>
+    <div class="go-actions">
+      <button class="btn-ghost" id="go-retry">RETRY</button>
+      <button class="btn-ghost" id="go-share">SHARE</button>
+      <button class="btn-ghost" id="go-menu">MAIN MENU</button>
+    </div>
+  </div>
+
+  <div id="pause-screen">
+    <div class="pause-title">PAUSED</div>
+    <div style="display:flex; gap: 14px">
+      <button class="btn-ghost" id="pause-resume">RESUME</button>
+      <button class="btn-ghost" id="pause-menu">MAIN MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast layer ─── -->
+<div id="toast-layer"></div>
+
+<!-- ─── Scripts ─── -->
+<script src="js/storage.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/game.js"></script>
+<script src="js/launcher.js"></script>
+
+</body>
+</html>
