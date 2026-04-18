@@ -40,10 +40,20 @@ autoUpdater.on('download-progress', (progress) => {
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  console.log('[updater] Update downloaded:', info.version);
+  console.log('[updater] Update downloaded:', info.version, '— scheduling auto-install in 8s');
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded', { version: info.version });
   }
+  // Aggressive auto-install: if the user does nothing for 8 seconds, quit and install
+  // so future updates really do feel "always up to date" without requiring a click.
+  setTimeout(() => {
+    try {
+      console.log('[updater] Auto-installing update now');
+      autoUpdater.quitAndInstall(false, true);
+    } catch (err) {
+      console.error('[updater] quitAndInstall failed:', err.message);
+    }
+  }, 8000);
 });
 
 autoUpdater.on('error', (err) => {
@@ -81,6 +91,10 @@ function createWindow() {
     setTimeout(() => {
       autoUpdater.checkForUpdates().catch(() => {});
     }, 5000);
+    // Re-check every 15 minutes while the app is running — keeps long sessions fresh
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 15 * 60 * 1000);
   });
 
   mainWindow.on('closed', () => {

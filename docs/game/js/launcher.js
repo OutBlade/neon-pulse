@@ -291,9 +291,21 @@
       const bar     = document.getElementById('update-bar');
       const barText = document.getElementById('update-bar-text');
       const barBtn  = document.getElementById('update-bar-btn');
-      barText.innerHTML = `UPDATE READY &nbsp;&mdash;&nbsp; <span>v${info.version}</span> &nbsp;downloaded`;
+      // Match main.js's 8-second auto-install timer so the user sees exactly
+      // when it's about to happen and can install right now if they prefer.
+      let secs = 8;
+      const render = () => {
+        barText.innerHTML = `UPDATE READY &nbsp;&mdash;&nbsp; <span>v${info.version}</span> &nbsp;&middot;&nbsp; auto-install in ${secs}s`;
+      };
+      render();
       bar.style.display = 'flex';
+      barBtn.textContent = 'INSTALL NOW';
       barBtn.onclick = () => window.neon.installUpdate();
+      const tick = setInterval(() => {
+        secs -= 1;
+        if (secs <= 0) { clearInterval(tick); barText.innerHTML = `INSTALLING v${info.version}&hellip;`; }
+        else render();
+      }, 1000);
     });
   }
 

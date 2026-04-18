@@ -3,6 +3,13 @@
 All notable changes to Neon Pulse are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.1] - 2026-04-18 — AGGRESSIVE AUTO-UPDATE
+
+### Changed
+- `main.js`: on `update-downloaded`, schedule `quitAndInstall` automatically after 8 seconds so updates install without requiring a button click. The in-app banner still offers INSTALL NOW for anyone who wants it immediately.
+- `main.js`: periodic update re-check every 15 minutes while the app is running, in addition to the 5s post-launch check. Long sessions pick up new versions without restart.
+- `src/js/launcher.js`: update banner shows a live countdown ("auto-install in 8s") and switches to "INSTALLING v0.3.1..." when the timer fires.
+
 ## [0.3.0] - 2026-04-18 — THE VIRAL UPDATE
 
 ### Added
