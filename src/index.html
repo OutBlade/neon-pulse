@@ -32,14 +32,38 @@
         <h1 class="title" data-text="NEON PULSE"><span class="split">NEON PULSE</span></h1>
         <p class="tagline">A precision dash roguelike</p>
       </div>
-      <nav class="menu">
-        <button class="menu-btn primary" id="btn-play">PLAY</button>
-        <button class="menu-btn"         id="btn-settings">SETTINGS</button>
-        <button class="menu-btn"         id="btn-stats">STATS</button>
-        <button class="menu-btn"         id="btn-achievements">ACHIEVEMENTS</button>
-        <button class="menu-btn"         id="btn-credits">CREDITS</button>
-        <button class="menu-btn"         id="btn-quit">QUIT</button>
-      </nav>
+      <div class="menu-layout">
+        <nav class="menu">
+          <button class="menu-btn primary" id="btn-play">PLAY</button>
+          <button class="menu-btn"         id="btn-settings">SETTINGS</button>
+          <button class="menu-btn"         id="btn-stats">STATS</button>
+          <button class="menu-btn"         id="btn-achievements">ACHIEVEMENTS</button>
+          <button class="menu-btn"         id="btn-credits">CREDITS</button>
+          <button class="menu-btn"         id="btn-quit">QUIT</button>
+        </nav>
+        <aside class="news-pane" id="news-pane">
+          <div class="news-head">
+            <span class="news-label">PATCH NOTES</span>
+            <span class="news-version" id="news-version">v0.3.0</span>
+          </div>
+          <div class="news-body" id="news-body">
+            <div class="news-entry">
+              <div class="news-entry-title">THE VIRAL UPDATE</div>
+              <ul>
+                <li>NEW: CURSED upgrade tier. Glass Cannon. Gambler. All Gas No Brakes.</li>
+                <li>NEW: Kill callouts. Rack up a dash-chain for POLYGON ANNIHILATION.</li>
+                <li>NEW: Shareable run-summary PNG card. Posting it is the whole point.</li>
+                <li>NEW: Death cam with rotating last-words. Clip it.</li>
+                <li>PERF: Enemy sprite caching + arena bake-off. Up to 40% fewer draw ops.</li>
+                <li>OPT: FPS cap (30/60/120/144/uncapped) in Settings for weaker rigs.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="news-foot">
+            <span id="news-best-hint">Best: <span id="news-best-score">—</span></span>
+          </div>
+        </aside>
+      </div>
     </section>
 
     <!-- Settings -->
@@ -90,6 +114,21 @@
             <div class="setting-hint">Retro display filter</div>
           </div>
           <div class="toggle" id="tog-crt"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Frame Rate Cap</div>
+            <div class="setting-hint">Cap the renderer (0 = uncapped, follows monitor)</div>
+          </div>
+          <div class="setting-control">
+            <select id="set-fpscap" class="fps-select">
+              <option value="0">UNCAPPED</option>
+              <option value="30">30 FPS</option>
+              <option value="60">60 FPS</option>
+              <option value="120">120 FPS</option>
+              <option value="144">144 FPS</option>
+            </select>
+          </div>
         </div>
         <div class="panel-footer">
           <button class="btn-ghost" id="btn-reset-save">RESET SAVE</button>

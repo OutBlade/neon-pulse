@@ -162,6 +162,8 @@
     toggleState('tog-parts',   s.particles);
     toggleState('tog-crt',     s.crtFilter);
     applyCRT(s.crtFilter);
+    const fpsSel = document.getElementById('set-fpscap');
+    if (fpsSel) fpsSel.value = String(s.fpsCap || 0);
   }
   function toggleState(id, on) {
     const el = document.getElementById(id);
@@ -192,6 +194,14 @@
   wireToggle('tog-parts',   'particles');
   wireToggle('tog-crt',     'crtFilter', applyCRT);
 
+  const fpsSel = document.getElementById('set-fpscap');
+  if (fpsSel) {
+    fpsSel.addEventListener('change', (e) => {
+      storage.setSetting('fpsCap', parseInt(e.target.value, 10) || 0);
+      audio.menuSelect();
+    });
+  }
+
   function applyCRT(on) {
     document.getElementById('scanlines').style.display = on ? 'block' : 'none';
   }
@@ -206,6 +216,15 @@
       toast({ name: 'Save Data', desc: 'All progress reset.' });
     }
   });
+
+  // ─── Main-menu news pane "Best: X" hint ──
+  function refreshMenuHint() {
+    const el = document.getElementById('news-best-score');
+    if (!el) return;
+    el.textContent = storage.stats.bestScore > 0
+      ? storage.stats.bestScore.toLocaleString()
+      : 'no runs yet';
+  }
 
   // ─── Stats refresh ────────────────────────
   function refreshStats() {
@@ -291,6 +310,7 @@
         audio.startAmbient();
         refreshStats();
         refreshAchievements();
+        refreshMenuHint();
       },
     });
   }
@@ -317,4 +337,8 @@
 
   // Initial screen
   showScreen('screen-menu');
+  refreshMenuHint();
+
+  // Keep "Best" hint fresh after runs return to menu
+  const origStart = startGame;
 })();

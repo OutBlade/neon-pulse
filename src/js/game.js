@@ -13,7 +13,7 @@ const CFG = {
   // player
   PLAYER_RADIUS:   10,
   PLAYER_LIVES:    3,
-  IFRAMES_MS:      1200,
+  IFRAMES_MS:      800,        // BALANCE AUDIT 2026-04-18: was 1200; ratio 1200/360=3.33 let player dash 3x during iframes (no real risk window); 800/360=2.2 keeps recovery feel while restoring ~400ms post-iframes vulnerability
   AUTO_MOVE_SPEED: 1.4,       // slow drift toward cursor when not dashing
   FRICTION:        0.88,
 
@@ -127,9 +127,21 @@ const UPGRADES = [
     apply: s => s.iframeMult *= 2.0 },
   { id: 'scavenger',    rarity: 'legendary', name: 'Scavenger',    desc: 'Every arena starts with +1 life (max 5).', max: 1,
     apply: s => s.scavenger = true },
+
+  // cursed (viral meme tier: big numbers, big downsides, very clippable)
+  { id: 'glass_cannon', rarity: 'cursed', name: 'GLASS CANNON',    desc: 'Score x2. You have 1 life. No take-backsies.', max: 1,
+    apply: s => { s.scoreMult = (s.scoreMult||1) * 2.0; s.glassCannon = true; } },
+  { id: 'caffeine',     rarity: 'cursed', name: 'CAFFEINE OVERDOSE', desc: 'Everything moves 30% faster. Yes, you too. Sorry.', max: 1,
+    apply: s => { s.globalSpeedMult = (s.globalSpeedMult||1) * 1.3; } },
+  { id: 'big_mode',     rarity: 'cursed', name: 'HONEY I SHRUNK THE HITBOX', desc: 'Dash radius x2. Your hitbox also x1.4. Skill issue awaits.', max: 1,
+    apply: s => { s.dashRadiusMult *= 2.0; s.playerSizeMult = (s.playerSizeMult||1) * 1.4; } },
+  { id: 'gambler',      rarity: 'cursed', name: 'THE GAMBLER',     desc: '50% chance per kill: +500 points. Or -500. House always wins.', max: 1,
+    apply: s => { s.gambler = true; } },
+  { id: 'rage',         rarity: 'cursed', name: 'ALL GAS NO BRAKES', desc: 'Dash cooldown gone. Friction gone. Sleep? Never heard of her.', max: 1,
+    apply: s => { s.dashCooldownMult *= 0.0; s.frictionOff = true; } },
 ];
 
-const RARITY_WEIGHTS = { common: 70, rare: 25, legendary: 5 };
+const RARITY_WEIGHTS = { common: 62, rare: 25, legendary: 10, cursed: 3 };
 
 function rollUpgrades(picks = 3, ownedMap) {
   const pool = UPGRADES.filter(u => (ownedMap[u.id] || 0) < u.max);
@@ -140,8 +152,9 @@ function rollUpgrades(picks = 3, ownedMap) {
     // rarity roll
     const r = Math.random() * 100;
     let rarity;
-    if (r < RARITY_WEIGHTS.legendary) rarity = 'legendary';
-    else if (r < RARITY_WEIGHTS.legendary + RARITY_WEIGHTS.rare) rarity = 'rare';
+    if (r < RARITY_WEIGHTS.cursed) rarity = 'cursed';
+    else if (r < RARITY_WEIGHTS.cursed + RARITY_WEIGHTS.legendary) rarity = 'legendary';
+    else if (r < RARITY_WEIGHTS.cursed + RARITY_WEIGHTS.legendary + RARITY_WEIGHTS.rare) rarity = 'rare';
     else rarity = 'common';
     const tier = pool.filter(u => u.rarity === rarity && !used.has(u.id));
     const candidates = tier.length ? tier : pool.filter(u => !used.has(u.id));
@@ -216,6 +229,7 @@ function resize() {
   canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  arenaSprite = null; // invalidate arena sprite cache on resize
 }
 
 // ─────────────────────────────────────────────────────
@@ -237,9 +251,18 @@ function initRun() {
     echo:             false,
     iframeMult:       1.0,
     scavenger:        false,
+    // cursed tier
+    scoreMult:        1.0,
+    glassCannon:      false,
+    globalSpeedMult:  1.0,
+    playerSizeMult:   1.0,
+    gambler:          false,
+    frictionOff:      false,
   };
   ownedUpgrades = {};
 
+  // Apply cursed one-shot on init for flags that change base stats
+  // (scavenger/glassCannon handled after upgrades pick; lives reduced if picked mid-run)
   player = {
     x: W / 2, y: H / 2,
     vx: 0, vy: 0,
@@ -313,8 +336,8 @@ function spawnBoss(arenaNum) {
     x: W / 2, y: H / 2 - 120,
     vx: 0, vy: 0,
     radius: 34 + tier * 4,
-    hp: 10 + tier * 6,
-    hpMax: 10 + tier * 6,
+    hp: 6 + tier * 4,     // BALANCE AUDIT 2026-04-18: was 10+tier*6 → arena5=16,arena10=22; now arena5=10,arena10=14 (target 8-15)
+    hpMax: 6 + tier * 4, // BALANCE AUDIT 2026-04-18
     speed: 0.6 + tier * 0.1,
     color: '#ff2a6d',
     score: 2500 + tier * 1000,
@@ -457,11 +480,23 @@ function exitToMenu() {
   stop(true);
 }
 function shareScore() {
-  const text = `🎮 NEON PULSE — Score: ${runMeta.score.toLocaleString()} | Arena ${arena.num} | Max Combo x${runMeta.maxCombo} | ${runMeta.kills} kills\nCan you beat me? #NeonPulse`;
+  const text = `NEON PULSE  Score: ${runMeta.score.toLocaleString()} | Arena ${arena.num} | Max Combo x${runMeta.maxCombo} | ${runMeta.kills} kills\nCan you beat me? #NeonPulse`;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => {
-      NEON.toast({ name: 'Score copied to clipboard!' });
+      NEON.toast({ name: 'Score copied!' });
     });
+  }
+  // Also auto-download the shareable summary PNG
+  try {
+    const dataUrl = buildSummaryCard();
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `neon-pulse-${runMeta.score}-arena${arena.num}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    console.warn('[share] summary card failed', err);
   }
 }
 
@@ -533,6 +568,8 @@ function spawnEnemy(type) {
       e.speed = CFG.BASIC_SPEED * 1.5; e.radius = 7; e.hp = 1; e.color = CFG.COLORS.baby; e.score = CFG.SCORE_BABY;
       break;
   }
+  e.speed *= 1 + (arena.num - 1) * 0.035; // BALANCE AUDIT 2026-04-18: 3.5% speed increase per arena so each wave is measurably harder
+  e.speed *= (stats.globalSpeedMult || 1); // cursed: caffeine overdose
   enemies.push(e);
 }
 
@@ -556,6 +593,15 @@ function spawnWaveBatch() {
 function loop(now) {
   if (!running) return;
   if (paused) return;
+  // Optional FPS cap (0 = uncapped). Skip-frame throttle — cheap and accurate.
+  const cap = (NEON.storage && NEON.storage.settings && NEON.storage.settings.fpsCap) || 0;
+  if (cap > 0) {
+    const minDelta = 1000 / cap - 1;
+    if (now - lastTime < minDelta) {
+      requestAnimationFrame(loop);
+      return;
+    }
+  }
   const dt = Math.min(50, now - lastTime);
   lastTime = now;
 
@@ -927,9 +973,15 @@ function killEnemy(idx, ctxObj) {
     });
   }
 
-  // Score & combo
+  // Score & combo (score mult from cursed upgrades stacks on combo mult)
   const comboMult = 1 + combo.value * 0.1;
-  const gained = Math.floor(e.score * comboMult);
+  let gained = Math.floor(e.score * comboMult * (stats.scoreMult || 1));
+  // Gambler: coin-flip on every kill — +500 or -500 (min 0)
+  if (stats.gambler) {
+    const swing = Math.random() < 0.5 ? 500 : -500;
+    gained = Math.max(0, gained + swing);
+    spawnDamageNumber(e.x, e.y - 14, (swing >= 0 ? '+' : '') + swing, swing > 0 ? '#ffff66' : '#ff2a6d');
+  }
   addScore(gained);
   spawnDamageNumber(e.x, e.y, '+' + gained, comboMult >= 1.5 ? '#ff2a6d' : '#05d9e8');
 
@@ -945,6 +997,8 @@ function killEnemy(idx, ctxObj) {
   if (ctxObj.source === 'dash') {
     player.dashKillsThisDash += 1;
     player.dashKillStreak   += 1;
+    // Rising kill callout on multi-kill in one dash (the viral moment)
+    showKillCallout(player.dashKillsThisDash);
     NEON.achievements.checkOnKill({
       killsThisDash: player.dashKillsThisDash,
       totalKillsAllTime: NEON.storage.stats.totalKills + runMeta.kills,
@@ -1049,6 +1103,10 @@ function showUpgradeChoices() {
 function pickUpgrade(u) {
   u.apply(stats);
   ownedUpgrades[u.id] = (ownedUpgrades[u.id] || 0) + 1;
+  // Glass Cannon: snap player to 1 life immediately
+  if (u.id === 'glass_cannon') player.lives = 1;
+  // Honey I shrunk the hitbox: update player radius
+  if (u.id === 'big_mode') player.radius = CFG.PLAYER_RADIUS * stats.playerSizeMult;
   runMeta.upgradesPicked += 1;
   NEON.achievements.checkOnUpgradePick(u.rarity);
   if (NEON.audio) NEON.audio.upgrade();
@@ -1090,7 +1148,19 @@ function gameOver() {
   document.getElementById('go-combo').textContent = 'x' + runMeta.maxCombo;
   document.getElementById('go-kills').textContent = runMeta.kills;
   document.getElementById('go-new-best').classList.toggle('show', newBest);
-  document.getElementById('gameover-screen').classList.add('show');
+  // Meme last-words quote
+  let quoteEl = document.getElementById('go-quote');
+  if (!quoteEl) {
+    quoteEl = document.createElement('div');
+    quoteEl.id = 'go-quote';
+    const goScreen = document.getElementById('gameover-screen');
+    goScreen.insertBefore(quoteEl, goScreen.querySelector('.go-stats'));
+  }
+  quoteEl.textContent = '"' + pickLastWords() + '"';
+  // Death cam — brief pause on the last frame before the game-over panel lands
+  setTimeout(() => {
+    document.getElementById('gameover-screen').classList.add('show');
+  }, 650);
 }
 
 // ─────────────────────────────────────────────────────
@@ -1285,20 +1355,11 @@ function drawBossHP(b) {
 }
 
 function drawArena(cx, cy, r) {
-  // outer ring
+  // Cached ring + fill (static — only the timer arc redraws)
+  ctx.drawImage(getArenaSprite(cx, cy, r), 0, 0);
   ctx.save();
-  ctx.strokeStyle = 'rgba(5, 217, 232, 0.5)';
-  ctx.lineWidth = 2;
   ctx.shadowBlur = 16;
   ctx.shadowColor = '#05d9e8';
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
-
-  // inner soft fill
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  grad.addColorStop(0, 'rgba(5, 217, 232, 0.025)');
-  grad.addColorStop(1, 'rgba(5, 217, 232, 0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
 
   // timer arc
   const progress = Math.max(0, arena.timeRemainingMs / (CFG.ARENA_DURATION_SEC * 1000));
@@ -1312,6 +1373,25 @@ function drawArena(cx, cy, r) {
 }
 
 function drawEnemy(e) {
+  // Cached static sprites (no rotation needed) — huge perf win vs per-frame shadowBlur
+  if (e.type === 'basic' || e.type === 'baby' || e.type === 'splitter') {
+    const sp = getEnemySprite(e.type, e.radius, e.color);
+    ctx.drawImage(sp.canvas, e.x - sp.half, e.y - sp.half);
+    return;
+  }
+  if (e.type === 'tank') {
+    const sp = getEnemySprite(e.type, e.radius, e.color);
+    ctx.drawImage(sp.canvas, e.x - sp.half, e.y - sp.half);
+    // HP pips (dynamic)
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle = e.color;
+    for (let i = 0; i < e.hp; i++) {
+      ctx.beginPath(); ctx.arc(-6 + i * 6, 0, 2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(e.x, e.y);
   ctx.shadowBlur = 14;
@@ -1320,12 +1400,8 @@ function drawEnemy(e) {
   ctx.fillStyle   = e.color + '22';
   ctx.lineWidth = 2;
 
-  if (e.type === 'basic' || e.type === 'baby') {
-    // diamond
-    ctx.beginPath();
-    ctx.moveTo(0, -e.radius); ctx.lineTo(e.radius, 0);
-    ctx.lineTo(0, e.radius);  ctx.lineTo(-e.radius, 0);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (false) {
+    // diamond (handled above via cache)
   } else if (e.type === 'fast') {
     // arrow/triangle
     const a = Math.atan2(player.y - e.y, player.x - e.x);
@@ -1573,6 +1649,214 @@ function showArenaAnnounce(num) {
 }
 
 // ─────────────────────────────────────────────────────
+// KILL CALLOUTS  (rising text for multi-kills — the streamer clip moments)
+// ─────────────────────────────────────────────────────
+const KILL_CALLOUTS = [
+  null,                  // 1 — nothing
+  null,                  // 2
+  'DOUBLE KILL',         // 3
+  'TRIPLE KILL',         // 4
+  'QUAD PULSE',          // 5
+  'RAMPAGE',             // 6
+  'CHAOS PROTOCOL',      // 7
+  'POLYGON ANNIHILATION',// 8
+  'DIGITAL GENOCIDE',    // 9
+  'UNSTOPPABLE',         // 10+
+];
+let calloutTextEl = null;
+function showKillCallout(n) {
+  if (n < 3) return;
+  const text = KILL_CALLOUTS[Math.min(n, KILL_CALLOUTS.length - 1)] || 'UNSTOPPABLE';
+  if (!calloutTextEl) {
+    calloutTextEl = document.createElement('div');
+    calloutTextEl.id = 'kill-callout';
+    document.getElementById('hud').appendChild(calloutTextEl);
+  }
+  calloutTextEl.textContent = text;
+  calloutTextEl.classList.remove('show');
+  void calloutTextEl.offsetWidth;
+  calloutTextEl.classList.add('show');
+}
+
+// ─────────────────────────────────────────────────────
+// SPRITE CACHE  (bake shadow-glow + shape once, drawImage thereafter)
+// Big perf win: shadowBlur is by far the most expensive canvas op.
+// ─────────────────────────────────────────────────────
+const spriteCache = new Map();
+function getEnemySprite(type, radius, color) {
+  const key = type + ':' + Math.round(radius) + ':' + color;
+  let sp = spriteCache.get(key);
+  if (sp) return sp;
+  const pad = 24;
+  const size = Math.ceil((radius + pad) * 2);
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const cx = c.getContext('2d');
+  cx.translate(size / 2, size / 2);
+  cx.shadowBlur = 14;
+  cx.shadowColor = color;
+  cx.strokeStyle = color;
+  cx.fillStyle = color + '22';
+  cx.lineWidth = 2;
+  if (type === 'basic' || type === 'baby') {
+    cx.beginPath();
+    cx.moveTo(0, -radius); cx.lineTo(radius, 0);
+    cx.lineTo(0, radius);  cx.lineTo(-radius, 0);
+    cx.closePath(); cx.fill(); cx.stroke();
+  } else if (type === 'tank') {
+    cx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i - Math.PI / 6;
+      const x = Math.cos(a) * radius, y = Math.sin(a) * radius;
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    }
+    cx.closePath(); cx.fill(); cx.stroke();
+  } else if (type === 'splitter') {
+    cx.beginPath();
+    cx.rect(-radius, -radius, radius * 2, radius * 2);
+    cx.fill(); cx.stroke();
+    cx.strokeStyle = color + '88';
+    cx.beginPath();
+    cx.moveTo(-radius, 0); cx.lineTo(radius, 0);
+    cx.moveTo(0, -radius); cx.lineTo(0, radius);
+    cx.stroke();
+  }
+  sp = { canvas: c, half: size / 2 };
+  spriteCache.set(key, sp);
+  return sp;
+}
+// Arena ring cached (static per W/H)
+let arenaSprite = null, arenaSpriteKey = '';
+function getArenaSprite(cx, cy, r) {
+  const key = Math.round(W) + 'x' + Math.round(H);
+  if (arenaSprite && arenaSpriteKey === key) return arenaSprite;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  x.strokeStyle = 'rgba(5, 217, 232, 0.5)';
+  x.lineWidth = 2;
+  x.shadowBlur = 16;
+  x.shadowColor = '#05d9e8';
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke();
+  const grad = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0, 'rgba(5, 217, 232, 0.025)');
+  grad.addColorStop(1, 'rgba(5, 217, 232, 0)');
+  x.fillStyle = grad;
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+  arenaSpriteKey = key;
+  arenaSprite = c;
+  return c;
+}
+
+// ─────────────────────────────────────────────────────
+// MEME DEATH CAM  (slow-mo + last words quote on game over)
+// ─────────────────────────────────────────────────────
+const LAST_WORDS = [
+  'tell my mom i made it to arena {A}',
+  'skill issue',
+  'lag. it was definitely lag.',
+  'i had it, bro',
+  '{S} points is still based',
+  'the polygons won this round',
+  '{K} kills of pure rizz',
+  'wifi did me dirty',
+  'one more run. ONE MORE RUN.',
+  'unsubscribe from my cringe',
+  'that enemy was hacking',
+  'brb, getting cooler friends',
+  'dashed straight into lore',
+  'my mouse has input lag trust',
+  'arena {A}. nature is healing.',
+];
+function pickLastWords() {
+  const q = LAST_WORDS[Math.floor(Math.random() * LAST_WORDS.length)];
+  return q
+    .replace('{A}', arena.num)
+    .replace('{S}', runMeta.score.toLocaleString())
+    .replace('{K}', runMeta.kills);
+}
+
+// ─────────────────────────────────────────────────────
+// RUN SUMMARY PNG  (shareable card for tweets / discord)
+// ─────────────────────────────────────────────────────
+function buildSummaryCard() {
+  const w = 1200, h = 630;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  // bg
+  const bg = x.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, '#05020a');
+  bg.addColorStop(1, '#14071f');
+  x.fillStyle = bg; x.fillRect(0, 0, w, h);
+  // grid
+  x.strokeStyle = 'rgba(5,217,232,0.07)';
+  for (let gx = 0; gx < w; gx += 60) { x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx, h); x.stroke(); }
+  for (let gy = 0; gy < h; gy += 60) { x.beginPath(); x.moveTo(0, gy); x.lineTo(w, gy); x.stroke(); }
+  // neon halo
+  const halo = x.createRadialGradient(w * 0.78, h * 0.5, 20, w * 0.78, h * 0.5, 420);
+  halo.addColorStop(0, 'rgba(255,42,109,0.35)');
+  halo.addColorStop(1, 'rgba(255,42,109,0)');
+  x.fillStyle = halo; x.fillRect(0, 0, w, h);
+  // title
+  x.fillStyle = '#05d9e8';
+  x.shadowColor = '#05d9e8'; x.shadowBlur = 18;
+  x.font = '900 28px Orbitron, Segoe UI, sans-serif';
+  x.fillText('NEON PULSE', 60, 90);
+  x.shadowBlur = 0;
+  x.fillStyle = '#ff2a6d';
+  x.font = '700 14px Consolas, monospace';
+  x.fillText('RUN SUMMARY · ' + new Date().toLocaleDateString(), 60, 116);
+  // score (hero)
+  x.fillStyle = '#ffffff';
+  x.shadowColor = '#05d9e8'; x.shadowBlur = 30;
+  x.font = '900 160px Orbitron, Segoe UI, sans-serif';
+  x.fillText(runMeta.score.toLocaleString(), 60, 300);
+  x.shadowBlur = 0;
+  x.fillStyle = '#9aa7bd';
+  x.font = '700 14px Consolas, monospace';
+  x.fillText('FINAL SCORE', 60, 330);
+  // stats row
+  const stats_ = [
+    ['ARENA',     arena.num,                  '#05d9e8'],
+    ['MAX COMBO', 'x' + runMeta.maxCombo,     '#ff2a6d'],
+    ['KILLS',     runMeta.kills,              '#b967ff'],
+    ['DASHES',    runMeta.dashes,             '#ffff66'],
+  ];
+  for (let i = 0; i < stats_.length; i++) {
+    const [lbl, val, col] = stats_[i];
+    const sx = 60 + i * 260;
+    x.fillStyle = col;
+    x.font = '900 56px Orbitron, Segoe UI, sans-serif';
+    x.fillText(val, sx, 440);
+    x.fillStyle = '#6b778c';
+    x.font = '700 12px Consolas, monospace';
+    x.fillText(lbl, sx, 465);
+  }
+  // footer
+  x.fillStyle = '#6b778c';
+  x.font = '700 12px Consolas, monospace';
+  x.fillText('github.com/OutBlade/neon-pulse · #NeonPulse', 60, h - 40);
+  // epithet
+  x.fillStyle = '#ffffff';
+  x.font = '700 16px Consolas, monospace';
+  const epithet = pickEpithet();
+  x.fillText('"' + epithet + '"', 60, h - 72);
+  return c.toDataURL('image/png');
+}
+function pickEpithet() {
+  const score = runMeta.score;
+  const combo = runMeta.maxCombo;
+  if (score > 200000) return 'the chosen one';
+  if (combo >= 30) return 'combo demon';
+  if (runMeta.dashes > 300) return 'restless ghost';
+  if (arena.num >= 10) return 'certified polygon killer';
+  if (arena.num >= 5) return 'mid-boss survivor';
+  if (runMeta.kills > 100) return 'cleanup crew';
+  return 'a valiant attempt';
+}
+
+// ─────────────────────────────────────────────────────
 // UTILS
 // ─────────────────────────────────────────────────────
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
@@ -1580,6 +1864,6 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ─────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────
-window.NeonPulseGame = { start };
+window.NeonPulseGame = { start, buildSummaryCard: () => buildSummaryCard() };
 
 })();

@@ -452,3 +452,63 @@
   transition: opacity 0.6s;
 }
 #heal-flash.on { opacity: 1; }
+
+/* ── Kill callout (rising multi-kill text) ──── */
+#kill-callout {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  font-family: var(--font-display, 'Orbitron', 'Segoe UI', sans-serif);
+  font-weight: 900;
+  font-size: 64px;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+  text-shadow:
+    0 0 24px var(--accent, #ff2a6d),
+    0 0 48px var(--accent, #ff2a6d);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 14;
+  white-space: nowrap;
+}
+#kill-callout.show {
+  animation: kill-callout-pop 1.3s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+}
+@keyframes kill-callout-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); filter: blur(6px); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+  45%  { opacity: 1; transform: translate(-50%, -55%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -75%) scale(0.9); }
+}
+
+/* ── Game-over meme quote ───────────────────── */
+#go-quote {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 16px;
+  letter-spacing: 0.05em;
+  color: #9aa7bd;
+  max-width: 640px;
+  text-align: center;
+  opacity: 0.85;
+  margin-top: -8px;
+}
+
+/* ── Cursed rarity upgrade card ─────────────── */
+.upgrade-card.cursed {
+  border-color: #ff7a1c;
+  background: rgba(30, 8, 4, 0.92);
+  animation: cursed-shiver 2.6s ease-in-out infinite;
+}
+.upgrade-card.cursed:hover {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 45px rgba(255, 122, 28, 0.6);
+  border-color: #ff7a1c;
+}
+.upgrade-card.cursed .up-rarity { color: #ff7a1c; text-shadow: 0 0 8px rgba(255, 122, 28, 0.6); }
+.upgrade-card.cursed .up-name   { color: #ff7a1c; text-shadow: 0 0 12px rgba(255, 122, 28, 0.4); }
+@keyframes cursed-shiver {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(-0.5px, 0.5px); }
+  50%      { transform: translate(0.5px, -0.5px); }
+  75%      { transform: translate(-0.3px, -0.3px); }
+}

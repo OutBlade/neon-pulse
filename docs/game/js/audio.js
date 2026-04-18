@@ -61,17 +61,26 @@ class AudioEngine {
     osc.stop(t + attack + decay + 0.02);
   }
 
+  _getNoiseBuffer() {
+    // Cached 1-second white-noise buffer — previously we allocated
+    // a new Float32Array every SFX. Shared AudioBuffer is reusable.
+    if (this._noiseBuffer) return this._noiseBuffer;
+    const sr = this.ctx.sampleRate;
+    const buf = this.ctx.createBuffer(1, sr, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < sr; i++) d[i] = Math.random() * 2 - 1;
+    this._noiseBuffer = buf;
+    return buf;
+  }
+
   _noise({ duration = 0.2, gain = 0.2, filterFreq = 800, filterQ = 1 }) {
     if (!this.enabled || !this._started) return;
     this._ensureContext();
     if (!this.ctx) return;
     const t = this._now();
-    const bufferSize = Math.floor(this.ctx.sampleRate * duration);
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
+    src.buffer = this._getNoiseBuffer();
+    src.loop = true;
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.value = filterFreq;

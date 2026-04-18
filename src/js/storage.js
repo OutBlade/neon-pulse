@@ -11,6 +11,7 @@ const DEFAULTS = {
     chromaticAberration: true,
     particles: true,
     crtFilter: true,
+    fpsCap: 0, // 0 = uncapped, otherwise 30/60/120/144
   },
   stats: {
     totalRuns: 0,
