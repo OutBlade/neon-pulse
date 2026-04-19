@@ -241,10 +241,33 @@
   // ─── Main-menu news pane "Best: X" hint ──
   function refreshMenuHint() {
     const el = document.getElementById('news-best-score');
-    if (!el) return;
-    el.textContent = storage.stats.bestScore > 0
-      ? storage.stats.bestScore.toLocaleString()
-      : 'no runs yet';
+    if (el) {
+      el.textContent = storage.stats.bestScore > 0
+        ? storage.stats.bestScore.toLocaleString()
+        : 'no runs yet';
+    }
+    refreshAuraWidget();
+  }
+
+  function refreshAuraWidget() {
+    const br = storage.brainrot;
+    if (!br) return;
+    const lvl = br.auraLevel;
+    const prev = lvl > 0 ? storage.auraLevelThreshold(lvl - 1) : 0;
+    const next = storage.auraLevelThreshold(lvl);
+    const pct = Math.min(100, ((br.auraPoints - prev) / Math.max(1, next - prev)) * 100);
+    const lvlEl = document.getElementById('aw-level');
+    const apEl = document.getElementById('aw-ap');
+    const fillEl = document.getElementById('aw-fill');
+    const streakEl = document.getElementById('aw-streak');
+    if (lvlEl)   lvlEl.textContent = lvl;
+    if (apEl)    apEl.textContent = br.auraPoints.toLocaleString() + ' AP';
+    if (fillEl)  fillEl.style.width = pct + '%';
+    if (streakEl) {
+      streakEl.textContent = br.streakDays > 0
+        ? `daily streak: ${br.streakDays} day${br.streakDays === 1 ? '' : 's'}`
+        : 'daily streak: —';
+    }
   }
 
   // ─── Stats refresh ────────────────────────

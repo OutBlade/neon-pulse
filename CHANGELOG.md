@@ -3,6 +3,28 @@
 All notable changes to Neon Pulse are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.2] - 2026-04-19 — BRAINROT ADDICTION STACK
+
+Complete psychological engineering layer on top of BRAINROT MODE. Every known retention mechanic in a single mode.
+
+### Added
+- **AURA progression** (`storage.js`): every brainrot kill earns Aura Points. AP is permanent across runs. Level thresholds curve at `100 * (n+1)^1.45` so levels land fast early and stretch later. Menu shows a live AP bar, level, and next-threshold preview.
+- **Tiered jackpot rolls** (`game.js`): every kill rolls against six rarity tiers (COMMON x1.25 → MYTHIC x10 at 0.08%). Pity counter guarantees an EPIC+ payout after 40 unrewarded kills. Pity bar visible in the in-game HUD so the player can see the jackpot approaching.
+- **Escalating streak tiers**: HEATING UP (5) → ON GOD (10) → BUSSIN (15) → DELULU (20) → BRAINROT ASCENDED (30) → TERMINALLY ONLINE (50). Each tier fires a full-screen animated shout and a cascade of fake chat messages. Streak resets on damage with an "L + RATIO" chat burst.
+- **Fake live Twitch chat** (bottom-right panel): 19 cursed usernames, 25 generic reactions, and tier-specific reaction pools. Messages pop spontaneously (faster during streaks) and dump in bursts on jackpots and level-ups.
+- **JACKPOT flash** animation: full-screen radial flash + coin-rain particles + 120ms hit freeze on every EPIC+ payout. Four-screen-worth of hype per jackpot.
+- **RUN IT BACK** auto-retry on brainrot death: 3-2-1 countdown overlay on the game-over panel. Press R to retry instantly, ESC to cancel. The player is put back into a fresh run before they can think about stopping.
+- **End-of-run brainrot summary**: Aura gained, peak streak, jackpot count, level-up banner, animated AP progress bar, all painted directly on the game-over screen.
+- **Daily-streak system**: first brainrot run of each calendar day awards `100 + (streak - 1) * 50` bonus AP. Consecutive-day counter persisted; a skipped day resets to 1.
+
+### Changed
+- Storage schema extended with `brainrot` block (aura points, level, best streak, daily streak, unlocked labels, runs, jackpot count). Non-breaking: defaults deep-merge on load.
+- Menu layout gains an AURA widget card directly above the BRAINROT MODE button with live level, AP total, progress bar, and daily streak count.
+
+### Notes
+- All mechanics compound: streak feeds aura gain per kill, tier rolls feed pity/jackpots, jackpots feed chat reactions, deaths feed run-it-back, level-ups feed toasts. Every second of play has at least three ongoing reward meters.
+- The mode is balanced for bursts: 5-minute runs with a measurable level progression make the "just one more" impulse nearly mechanical.
+
 ## [0.4.1] - 2026-04-19 — BRAINROT MODE
 
 ### Added

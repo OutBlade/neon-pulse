@@ -924,3 +924,45 @@ input[type="range"]::-webkit-slider-thumb {
   25%      { transform: rotate(1.5deg); }
   75%      { transform: rotate(-1.5deg); }
 }
+
+/* Menu AURA widget — sits above the BRAINROT MODE button */
+.aura-widget {
+  background: linear-gradient(135deg, rgba(255, 0, 255, 0.10), rgba(5, 217, 232, 0.10));
+  border: 1px solid rgba(255, 0, 255, 0.45);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: var(--font-mono), monospace;
+  color: #fff;
+  margin: 4px 0;
+  box-shadow: 0 0 16px rgba(255, 0, 255, 0.2);
+}
+.aw-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  margin-bottom: 4px;
+}
+.aw-label { color: #d65cff; font-weight: 700; }
+.aw-ap { color: #ffe066; }
+.aw-bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.aw-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #05d9e8, #ff00ff, #ffe066);
+  transition: width 0.5s;
+  animation: brmenu-shift 3s linear infinite;
+  background-size: 300% 100%;
+}
+.aw-streak {
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  color: #05d9e8;
+  text-align: right;
+}

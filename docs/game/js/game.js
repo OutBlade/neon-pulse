@@ -205,18 +205,199 @@ const BRAINROT_WORDS = [
   'ICK', 'AURA +500', 'AURA -9999', 'CHAT IS THIS REAL',
   'PMO', 'SYBAU', 'GYATDAMN', 'ZESTY',
 ];
-const BRAINROT_BONUSES = [
-  { label: 'OHIO BONUS',    mult: 1.5 },
-  { label: 'RIZZ OVERLOAD', mult: 2.0 },
-  { label: 'SIGMA GRINDSET', mult: 1.75 },
-  { label: 'SKIBIDI SURGE',  mult: 3.0 },
-  { label: 'CERTIFIED W',    mult: 1.25 },
-  { label: 'GYATT JACKPOT',  mult: 2.5 },
+// Jackpot tiers — variable-ratio reward schedule. Probabilities chosen to
+// make the big payouts feel rare but not absent (slot-machine psychology).
+// The engine also runs a pity counter: 40 kills without an EPIC+ roll
+// guarantees one on the next kill so the player never feels unrewarded.
+const BRAINROT_TIERS = [
+  { id: 'common',    chance: 0.20, label: 'CERTIFIED W',    mult: 1.25, tier: 1, color: '#05d9e8' },
+  { id: 'uncommon',  chance: 0.10, label: 'SIGMA GRINDSET', mult: 1.75, tier: 2, color: '#ff2a6d' },
+  { id: 'rare',      chance: 0.05, label: 'OHIO BONUS',     mult: 2.00, tier: 3, color: '#d65cff' },
+  { id: 'epic',      chance: 0.02, label: 'GYATT JACKPOT',  mult: 3.00, tier: 4, color: '#ffe066' },
+  { id: 'legendary', chance: 0.004,label: 'SKIBIDI SURGE',  mult: 5.00, tier: 5, color: '#ffae00' },
+  { id: 'mythic',    chance: 0.0008, label: 'TERMINAL AURA',mult: 10.0, tier: 6, color: '#ffffff' },
+];
+function rollBrainrotTier(pityCount) {
+  // Pity: after 40 kills without an epic+ payout, guarantee one
+  if (pityCount >= 40) {
+    return BRAINROT_TIERS[3 + Math.floor(Math.random() * 3)]; // epic | legendary | mythic
+  }
+  const r = Math.random();
+  let acc = 0;
+  for (const t of BRAINROT_TIERS) {
+    acc += t.chance;
+    if (r < acc) return t;
+  }
+  return null; // no payout this kill
+}
+
+// Streak tier announcements — progressively unhinged as the player chains kills
+const STREAK_TIERS = [
+  { at: 5,  name: 'HEATING UP',        color: '#05d9e8' },
+  { at: 10, name: 'ON GOD',            color: '#ff2a6d' },
+  { at: 15, name: 'BUSSIN',            color: '#d65cff' },
+  { at: 20, name: 'DELULU',            color: '#ffe066' },
+  { at: 30, name: 'BRAINROT ASCENDED', color: '#ffae00' },
+  { at: 50, name: 'TERMINALLY ONLINE', color: '#ffffff' },
 ];
 function pickBrainrotWord() { return BRAINROT_WORDS[Math.floor(Math.random() * BRAINROT_WORDS.length)]; }
 function pickBrainrotColor() {
   const h = Math.floor(Math.random() * 360);
   return `hsl(${h}, 100%, 65%)`;
+}
+
+// ─── Per-run brainrot state ────────────────────
+let brState = null;
+function resetBrainrotState() {
+  brState = {
+    streak: 0,              // consecutive kills without taking damage
+    peakStreak: 0,
+    streakTimer: 0,         // ms until streak decays
+    announcedTier: 0,       // last tier announced so we don't repeat
+    pityCount: 0,           // kills since last epic+ payout
+    jackpots: 0,
+    apGained: 0,            // aura points earned this run
+    chatTimer: 0,           // ms until next spontaneous chat msg
+  };
+}
+function brainrotOnKill(e, baseGained) {
+  // Returns modified gain after tier multiplier + emits all side-effects
+  brState.streak += 1;
+  brState.streakTimer = 3500;
+  if (brState.streak > brState.peakStreak) brState.peakStreak = brState.streak;
+  // Streak tier shout
+  for (const tier of STREAK_TIERS) {
+    if (brState.streak >= tier.at && brState.announcedTier < tier.at) {
+      brState.announcedTier = tier.at;
+      announceStreakTier(tier);
+      pushChat(tier.name + ' !!', tier.color);
+      if (NEON.audio) NEON.audio.upgrade();
+      break;
+    }
+  }
+  // Jackpot roll
+  brState.pityCount += 1;
+  const tier = rollBrainrotTier(brState.pityCount);
+  let gained = baseGained;
+  if (tier) {
+    gained = Math.floor(gained * tier.mult);
+    spawnDamageNumber(e.x, e.y - 30, tier.label + ' x' + tier.mult, tier.color);
+    if (tier.tier >= 4) {
+      brState.pityCount = 0;
+      brState.jackpots += 1;
+      triggerJackpot(tier);
+    }
+  }
+  // Every kill — meme word float
+  spawnDamageNumber(e.x + (Math.random() - 0.5) * 20, e.y - 18, pickBrainrotWord(), pickBrainrotColor());
+  // Aura points: base 2 per kill, scale with streak and jackpot tier
+  const ap = 2 + Math.floor(brState.streak / 4) + (tier ? tier.tier * 3 : 0);
+  brState.apGained += ap;
+  // Occasional reactive chat
+  if (Math.random() < 0.08 || (tier && tier.tier >= 3)) {
+    pushChat(pickReactiveChat(tier), tier ? tier.color : pickBrainrotColor());
+  }
+  return gained;
+}
+function brainrotOnDamage() {
+  if (!brState) return;
+  if (brState.streak >= 5) pushChat('L + RATIO', '#ff2a6d');
+  brState.streak = 0;
+  brState.announcedTier = 0;
+}
+function announceStreakTier(tier) {
+  const el = document.getElementById('streak-tier');
+  if (!el) return;
+  el.textContent = tier.name;
+  el.style.color = tier.color;
+  el.classList.remove('show'); void el.offsetWidth; // restart animation
+  el.classList.add('show');
+}
+function triggerJackpot(tier) {
+  const flash = document.getElementById('jackpot-flash');
+  if (!flash) return;
+  flash.style.background = `radial-gradient(circle, ${tier.color}66 0%, transparent 70%)`;
+  flash.classList.remove('go'); void flash.offsetWidth;
+  flash.classList.add('go');
+  triggerShake(14);
+  hitFreezeMs = Math.max(hitFreezeMs, 120);
+  // coin-rain particles
+  for (let i = 0; i < 40; i++) {
+    particles.push({
+      x: W * Math.random(), y: -20,
+      vx: (Math.random() - 0.5) * 3,
+      vy: 3 + Math.random() * 4,
+      life: 1, decay: 0.008 + Math.random() * 0.01,
+      radius: 3 + Math.random() * 2,
+      color: tier.color,
+    });
+  }
+  pushChat('JACKPOT!! ' + tier.label, tier.color);
+  pushChat('CHAT IS THIS REAL', '#ffff66');
+  pushChat('CLIP IT NOW', '#05d9e8');
+}
+
+// ─── Fake Twitch chat overlay ────────────────
+const CHAT_NAMES = [
+  'ohio_enjoyer', 'skibidiFan99', 'sigma_grindset', 'rizzMaster', 'auraFarmer',
+  'goonsquad_17', 'mewing_andrew', 'certified_w', 'delulu_queen', 'gyattgod',
+  'fanum_taxed', 'npc_breaker', 'tung_tung_sahur', 'based_dept', 'kai_cenat_fan',
+  'zestyboi', 'chat_is_this_real', 'terminally_online', 'brainrot_connoisseur',
+];
+const CHAT_GENERIC = [
+  'HE\'S COOKING', 'KEKW', 'W streamer', 'POGGERS', 'LOL',
+  'this is peak', 'certified banger', 'OMEGALUL', 'clip it',
+  'actual sigma', 'aura +500', 'ratio', 'GYATDAMN',
+  'no way', 'insane', 'gg', 'W W W', 'SUBBED',
+  'donated $5: ohio bonus', 'unsubscribed', 'hello chat',
+  'first', 'mods?', 'this is brainrot', 'yuh', 'frfr',
+];
+const CHAT_ON_TIER = {
+  common:    ['W', 'yeah', 'nice'],
+  uncommon:  ['actual sigma', 'grindset', 'W'],
+  rare:      ['OHIO MOMENT', 'no way', 'peak'],
+  epic:      ['GYATDAMN', 'he\'s cooking', 'CLIP IT', 'SUBBED'],
+  legendary: ['SKIBIDI OVERLOAD', 'HOLY', 'donated $20', 'INSANE', 'TWITCH CHAT RATIO\'D'],
+  mythic:    ['TERMINAL AURA', 'CHAT THIS IS NOT REAL', 'BAN HIM', 'donated $100', 'GOAT'],
+};
+function pickReactiveChat(tier) {
+  if (tier && CHAT_ON_TIER[tier.id]) {
+    const pool = CHAT_ON_TIER[tier.id];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  return CHAT_GENERIC[Math.floor(Math.random() * CHAT_GENERIC.length)];
+}
+function pushChat(text, color) {
+  const root = document.getElementById('brainrot-chat');
+  if (!root) return;
+  const row = document.createElement('div');
+  row.className = 'bc-row';
+  const name = CHAT_NAMES[Math.floor(Math.random() * CHAT_NAMES.length)];
+  row.innerHTML = `<span class="bc-name" style="color:${color || '#d65cff'}">${name}:</span> <span class="bc-msg">${text}</span>`;
+  root.appendChild(row);
+  // Cap at 10 rows for perf
+  while (root.children.length > 10) root.removeChild(root.firstChild);
+  setTimeout(() => row.classList.add('fade'), 4500);
+  setTimeout(() => row.remove(), 6500);
+}
+function updateBrainrotHud() {
+  const hud = document.getElementById('brainrot-hud');
+  if (!hud) return;
+  hud.querySelector('.bh-streak-val').textContent = brState.streak;
+  hud.querySelector('.bh-ap-val').textContent = '+' + brState.apGained;
+  const pityBar = hud.querySelector('.bh-pity-fill');
+  if (pityBar) pityBar.style.width = Math.min(100, (brState.pityCount / 40) * 100) + '%';
+}
+
+function spontaneousChatTick(rawDt) {
+  if (!brState) return;
+  brState.chatTimer -= rawDt;
+  if (brState.chatTimer <= 0) {
+    pushChat(pickReactiveChat(null), pickBrainrotColor());
+    // More chatty during high streaks
+    const base = brState.streak >= 10 ? 700 : brState.streak >= 5 ? 1400 : 2800;
+    brState.chatTimer = base + Math.random() * 1500;
+  }
 }
 
 // Floating damage/score numbers
@@ -240,11 +421,24 @@ function startCustom(opts) {
   document.getElementById('game-root').classList.remove('brainrot');
   _boot(opts);
 }
-// BRAINROT MODE — the standard arena loop wrapped in pure internet poison
+// BRAINROT MODE — the standard arena loop wrapped in pure internet poison.
+// Addictive stack on top of the base loop: tiered jackpots with pity timer,
+// streak tier shouts, aura-points meta progression, fake live chat, and a
+// RUN-IT-BACK auto-retry flow. Everything permanent persists via storage.
 function startBrainrot(opts) {
   customDef = null;
   brainrotMode = true;
+  resetBrainrotState();
   document.getElementById('game-root').classList.add('brainrot');
+  // Daily streak bonus toast + bonus AP
+  const dailyInfo = NEON.storage.checkBrainrotDaily();
+  if (dailyInfo.freshToday) {
+    const bonus = 100 + (dailyInfo.streak - 1) * 50;
+    brState.apGained += bonus;
+    NEON.toast({ name: `DAILY LOCKED IN — DAY ${dailyInfo.streak}. +${bonus} AURA` });
+  }
+  pushChat('stream started', '#05d9e8');
+  pushChat('brainrot mode let\'s go', '#d65cff');
   _boot(opts);
 }
 function _boot(opts) {
@@ -270,6 +464,9 @@ function stop(goToMenu) {
   window.removeEventListener('resize', resize);
   document.getElementById('game-root').classList.remove('brainrot');
   brainrotMode = false;
+  clearRunItBack();
+  const chat = document.getElementById('brainrot-chat'); if (chat) chat.innerHTML = '';
+  const card = document.getElementById('br-summary'); if (card) card.remove();
   const cb = onExit; onExit = null;
   if (cb) cb();
 }
@@ -1001,6 +1198,20 @@ function update(dt, rawDt) {
     }
   }
 
+  // ─── Brainrot per-frame ticks ───
+  if (brainrotMode && brState) {
+    spontaneousChatTick(rawDt);
+    // Streak decay if no kills for a while
+    if (brState.streak > 0) {
+      brState.streakTimer -= rawDt;
+      if (brState.streakTimer <= 0) {
+        brState.streak = 0;
+        brState.announcedTier = 0;
+      }
+    }
+    updateBrainrotHud();
+  }
+
   updateHUD();
 }
 
@@ -1081,18 +1292,12 @@ function killEnemy(idx, ctxObj) {
     gained = Math.max(0, gained + swing);
     spawnDamageNumber(e.x, e.y - 14, (swing >= 0 ? '+' : '') + swing, swing > 0 ? '#ffff66' : '#ff2a6d');
   }
-  // BRAINROT MODE: surprise bonus multiplier on ~12% of kills
-  if (brainrotMode && Math.random() < 0.12) {
-    const bonus = BRAINROT_BONUSES[Math.floor(Math.random() * BRAINROT_BONUSES.length)];
-    gained = Math.floor(gained * bonus.mult);
-    spawnDamageNumber(e.x, e.y - 30, bonus.label + ' x' + bonus.mult, pickBrainrotColor());
+  // BRAINROT MODE: full addiction stack — tier rolls, streak, aura, chat
+  if (brainrotMode) {
+    gained = brainrotOnKill(e, gained);
   }
   addScore(gained);
   spawnDamageNumber(e.x, e.y, '+' + gained, comboMult >= 1.5 ? '#ff2a6d' : '#05d9e8');
-  // BRAINROT MODE: random meme word pops up above every dead enemy
-  if (brainrotMode) {
-    spawnDamageNumber(e.x + (Math.random() - 0.5) * 20, e.y - 18, pickBrainrotWord(), pickBrainrotColor());
-  }
 
   // Hit-freeze pulse — scales with combo for that satisfying heavy-hit feel
   if (combo.value >= 3 || e.type === 'tank' || e.type === 'boss') {
@@ -1148,6 +1353,7 @@ function hitPlayer() {
   player.lives -= 1;
   player.iframes = CFG.IFRAMES_MS * stats.iframeMult;
   setCombo(0);
+  if (brainrotMode) brainrotOnDamage();
   arena.tookDamage = true;
   spawnExplosion(player.x, player.y, '#ff2a6d', 18);
   triggerShake(14);
@@ -1306,7 +1512,102 @@ function gameOver() {
   // Death cam — brief pause on the last frame before the game-over panel lands
   setTimeout(() => {
     document.getElementById('gameover-screen').classList.add('show');
+    if (brainrotMode) finalizeBrainrotRun();
   }, 650);
+}
+
+// ─── Brainrot end-of-run report: aura, level-up, RUN IT BACK auto-retry ───
+function finalizeBrainrotRun() {
+  if (!brState) return;
+  // Record to storage + award aura
+  NEON.storage.recordBrainrotRun({
+    score:    runMeta.score,
+    kills:    runMeta.kills,
+    streak:   brState.peakStreak,
+    jackpots: brState.jackpots,
+  });
+  const apResult = NEON.storage.addAura(brState.apGained);
+  // Paint a brainrot-specific summary card over the gameover screen
+  const goScreen = document.getElementById('gameover-screen');
+  let card = document.getElementById('br-summary');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'br-summary';
+    goScreen.appendChild(card);
+  }
+  const brstate = NEON.storage.brainrot;
+  const nextThresh = NEON.storage.auraLevelThreshold(brstate.auraLevel);
+  const prevThresh = brstate.auraLevel > 0 ? NEON.storage.auraLevelThreshold(brstate.auraLevel - 1) : 0;
+  const pct = Math.min(100, ((brstate.auraPoints - prevThresh) / Math.max(1, nextThresh - prevThresh)) * 100);
+  card.innerHTML = `
+    <div class="brs-row"><span class="brs-label">AURA GAINED</span><span class="brs-val">+${brState.apGained}</span></div>
+    <div class="brs-row"><span class="brs-label">PEAK STREAK</span><span class="brs-val">${brState.peakStreak}</span></div>
+    <div class="brs-row"><span class="brs-label">JACKPOTS</span><span class="brs-val">${brState.jackpots}</span></div>
+    ${apResult.leveledUp ? `<div class="brs-levelup">LEVEL UP → ${apResult.newLevel}</div>` : ''}
+    <div class="brs-aura-bar"><div class="brs-aura-fill" style="width:${pct}%"></div></div>
+    <div class="brs-row small"><span>LVL ${brstate.auraLevel}</span><span>${brstate.auraPoints} / ${nextThresh} AP</span></div>
+    <div class="brs-runback">
+      <span class="brs-rb-label">RUN IT BACK IN</span>
+      <span class="brs-rb-count" id="brs-rb-count">3</span>
+      <span class="brs-rb-hint">press R to go now · ESC to cancel</span>
+    </div>
+  `;
+  if (apResult.leveledUp) {
+    pushChat('LEVEL UP', '#ffff66');
+    pushChat('he is literally him', '#d65cff');
+    if (NEON.audio) NEON.audio.achievement();
+  }
+  scheduleRunItBack();
+}
+
+let _rbTimer = null, _rbCountdown = null, _rbKeyHandler = null;
+function clearRunItBack() {
+  if (_rbTimer) { clearTimeout(_rbTimer); _rbTimer = null; }
+  if (_rbCountdown) { clearInterval(_rbCountdown); _rbCountdown = null; }
+  if (_rbKeyHandler) { window.removeEventListener('keydown', _rbKeyHandler); _rbKeyHandler = null; }
+}
+function scheduleRunItBack() {
+  clearRunItBack();
+  let secs = 3;
+  const countEl = document.getElementById('brs-rb-count');
+  _rbCountdown = setInterval(() => {
+    secs -= 1;
+    if (countEl) countEl.textContent = secs;
+  }, 1000);
+  _rbTimer = setTimeout(() => {
+    clearRunItBack();
+    // Auto-retry — rebuild the brainrot run
+    document.getElementById('gameover-screen').classList.remove('show');
+    document.getElementById('go-new-best').classList.remove('show');
+    resetBrainrotState();
+    brainrotMode = true;
+    document.getElementById('game-root').classList.add('brainrot');
+    initRun();
+    running = true;
+    paused = false;
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+    pushChat('RUN IT BACK', '#05d9e8');
+  }, 3500);
+  _rbKeyHandler = (e) => {
+    if (e.code === 'KeyR') { clearRunItBack(); _rbTimer = setTimeout(() => {}, 0); scheduleRunItBack.__doNow(); }
+    else if (e.code === 'Escape') { clearRunItBack(); }
+  };
+  // instant-trigger helper for R key
+  scheduleRunItBack.__doNow = () => {
+    clearRunItBack();
+    document.getElementById('gameover-screen').classList.remove('show');
+    document.getElementById('go-new-best').classList.remove('show');
+    resetBrainrotState();
+    brainrotMode = true;
+    document.getElementById('game-root').classList.add('brainrot');
+    initRun();
+    running = true;
+    paused = false;
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  };
+  window.addEventListener('keydown', _rbKeyHandler);
 }
 
 // ─────────────────────────────────────────────────────

@@ -35,6 +35,14 @@
       <div class="menu-layout">
         <nav class="menu">
           <button class="menu-btn primary" id="btn-play">PLAY</button>
+          <div class="aura-widget" id="aura-widget">
+            <div class="aw-head">
+              <span class="aw-label">AURA LVL <span id="aw-level">0</span></span>
+              <span class="aw-ap" id="aw-ap">0 AP</span>
+            </div>
+            <div class="aw-bar"><div class="aw-fill" id="aw-fill"></div></div>
+            <div class="aw-streak" id="aw-streak">daily streak: —</div>
+          </div>
           <button class="menu-btn brainrot-btn" id="btn-brainrot">BRAINROT MODE</button>
           <button class="menu-btn"         id="btn-workshop">WORKSHOP</button>
           <button class="menu-btn"         id="btn-settings">SETTINGS</button>
@@ -342,6 +350,19 @@
       <button class="btn-ghost" id="go-menu">MAIN MENU</button>
     </div>
   </div>
+
+  <!-- ─── BRAINROT MODE overlays ─── -->
+  <div id="brainrot-hud">
+    <div class="bh-row"><span class="bh-label">STREAK</span><span class="bh-streak-val">0</span></div>
+    <div class="bh-row"><span class="bh-label">AURA</span><span class="bh-ap-val">+0</span></div>
+    <div class="bh-pity">
+      <div class="bh-pity-label">NEXT JACKPOT</div>
+      <div class="bh-pity-bar"><div class="bh-pity-fill"></div></div>
+    </div>
+  </div>
+  <div id="streak-tier"></div>
+  <div id="jackpot-flash"></div>
+  <div id="brainrot-chat"></div>
 
   <div id="pause-screen">
     <div class="pause-title">PAUSED</div>

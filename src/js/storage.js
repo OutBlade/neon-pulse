@@ -25,6 +25,19 @@ const DEFAULTS = {
   achievements: {},  // id → true
   customArenas: {},  // id → arenaDef (see src/js/forge.js for schema)
   arenaScores:  {},  // arenaId → { bestScore, bestWave, runs }
+  brainrot: {
+    auraPoints:     0,    // lifetime AP (never resets)
+    auraLevel:      0,    // derived from AP but cached for UI
+    lifetimeKills:  0,    // brainrot-mode-only kills
+    bestScore:      0,
+    bestStreak:     0,
+    bestKills:      0,
+    runsPlayed:     0,
+    jackpotsHit:    0,
+    lastPlayDay:    null, // YYYY-MM-DD
+    streakDays:     0,    // consecutive daily play streak
+    unlockedLabels: [],   // ids of unlocked-by-level meme labels
+  },
 };
 
 function deepMerge(a, b) {
@@ -133,6 +146,65 @@ class Storage {
   }
   getArenaScore(arenaId) {
     return this.state.arenaScores[arenaId] || { bestScore: 0, bestWave: 0, runs: 0 };
+  }
+
+  // ── BRAINROT meta ────────────────────────────
+  get brainrot() { return this.state.brainrot; }
+
+  // AP required to hit level N (0-indexed). Gentle curve, fast early
+  // dopamine hits. Level 1 = 100 AP, 5 = 1150, 10 = 3400, 20 = 12800.
+  auraLevelThreshold(n) { return Math.floor(100 * Math.pow(n + 1, 1.45)); }
+  auraLevelFromAP(ap) {
+    let lvl = 0;
+    while (ap >= this.auraLevelThreshold(lvl)) lvl += 1;
+    return lvl;
+  }
+  addAura(n) {
+    const br = this.state.brainrot;
+    const prevLevel = br.auraLevel;
+    br.auraPoints += n;
+    const newLevel = this.auraLevelFromAP(br.auraPoints);
+    const leveledUp = newLevel > prevLevel;
+    br.auraLevel = newLevel;
+    this.save();
+    return { leveledUp, newLevel, gained: n, total: br.auraPoints };
+  }
+  recordBrainrotRun(result) {
+    // result: { score, kills, streak, jackpots, apGained }
+    const br = this.state.brainrot;
+    br.runsPlayed    += 1;
+    br.lifetimeKills += (result.kills    || 0);
+    br.jackpotsHit   += (result.jackpots || 0);
+    let newBest = false;
+    if (result.score  > br.bestScore)  { br.bestScore  = result.score;  newBest = true; }
+    if (result.streak > br.bestStreak) { br.bestStreak = result.streak; }
+    if (result.kills  > br.bestKills)  { br.bestKills  = result.kills;  }
+    this.save();
+    return newBest;
+  }
+  // Checks & updates the daily-play streak. Returns how many days in a row
+  // the player has opened brainrot mode (including today). Also returns
+  // whether today was already counted so callers can avoid re-awarding.
+  checkBrainrotDaily() {
+    const br = this.state.brainrot;
+    const today = new Date().toISOString().slice(0, 10);
+    if (br.lastPlayDay === today) {
+      return { streak: br.streakDays, freshToday: false };
+    }
+    // Is yesterday's date the last-play-day? → continue streak
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yesterday = y.toISOString().slice(0, 10);
+    br.streakDays = (br.lastPlayDay === yesterday) ? (br.streakDays + 1) : 1;
+    br.lastPlayDay = today;
+    this.save();
+    return { streak: br.streakDays, freshToday: true };
+  }
+  unlockLabel(id) {
+    const br = this.state.brainrot;
+    if (br.unlockedLabels.includes(id)) return false;
+    br.unlockedLabels.push(id);
+    this.save();
+    return true;
   }
 }
 
