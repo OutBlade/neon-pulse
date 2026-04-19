@@ -231,6 +231,29 @@ function rollBrainrotTier(pityCount) {
   return null; // no payout this kill
 }
 
+// ─── BRAINROT MINI-GAMES ──────────────────────────
+// Inspired by Crab Game + REPO. Every ~22s the rules flip to a new absurd
+// mode. No upgrades, no waves — just an escalating gauntlet of chaos.
+// Each game mutates spawn behavior, input, rendering, or physics.
+const BRAINROT_GAMES = [
+  { id: 'swarm',     name: 'SWARM',         hint: 'they are so many',        duration: 22000 },
+  { id: 'gigachonk', name: 'GIGA CHONK',    hint: 'one boy. one big boy.',   duration: 26000 },
+  { id: 'lava',      name: 'FLOOR IS LAVA', hint: 'stay in the middle',      duration: 22000 },
+  { id: 'inverted',  name: 'MIRROR WORLD',  hint: 'your mouse is lying',     duration: 20000 },
+  { id: 'yeet',      name: 'YEET CANNON',   hint: 'everything explodes',     duration: 20000 },
+  { id: 'bighead',   name: 'BIG HEAD MODE', hint: 'they are STARING',        duration: 22000 },
+  { id: 'speedrun',  name: 'DOUBLE TIME',   hint: '2x everything. GO.',      duration: 18000 },
+  { id: 'honk',      name: 'HONK HONK',     hint: 'clown physics engaged',   duration: 22000 },
+  { id: 'gravity',   name: 'GRAVITY WELL',  hint: 'the cursor pulls',        duration: 22000 },
+  { id: 'duck',      name: 'DUCK SEASON',   hint: 'every kill quacks',       duration: 20000 },
+  { id: 'stealth',   name: 'LIGHTS OUT',    hint: 'they hide in the dark',   duration: 22000 },
+  { id: 'squid',     name: 'RED LIGHT',     hint: 'freeze when the eye opens', duration: 26000 },
+];
+let brainrotGame = null;
+let brainrotGameIdx = 0;
+let brainrotRedLight = false;  // SQUID game: true when player must stand still
+let brainrotRedLightTimer = 0;
+
 // Streak tier announcements — progressively unhinged as the player chains kills
 const STREAK_TIERS = [
   { at: 5,  name: 'HEATING UP',        color: '#05d9e8' },
@@ -380,6 +403,71 @@ function pushChat(text, color) {
   setTimeout(() => row.classList.add('fade'), 4500);
   setTimeout(() => row.remove(), 6500);
 }
+// ─── Mini-game rotation ──────────────────────────
+function rollNextBrainrotGame() {
+  // Shuffle with recency bias: avoid immediately repeating the same game
+  const pool = BRAINROT_GAMES.filter(g => !brainrotGame || g.id !== brainrotGame.id);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function startBrainrotRound() {
+  const game = rollNextBrainrotGame();
+  brainrotGame = game;
+  brainrotGameIdx += 1;
+  // Wipe current enemies dramatically (each explodes)
+  for (const e of enemies) spawnExplosion(e.x, e.y, e.color, 8);
+  enemies.length = 0;
+  projectiles.length = 0;
+  // Mutate arena for this round
+  arena.num = brainrotGameIdx;
+  arena.timeRemainingMs = game.duration;
+  arena.spawnTimer = 0;
+  arena.enemyCountRemaining = 99999; // endless within the round
+  arena.isBoss = (game.id === 'gigachonk');
+  arena.cleared = false;
+  arena.tookDamage = false;
+  // Reset visual game class
+  const root = document.getElementById('game-root');
+  root.classList.forEach(c => { if (c.startsWith('brg-')) root.classList.remove(c); });
+  root.classList.add('brg-' + game.id);
+  // Give the player one dash charge each round
+  input.dashCharges = stats.maxCharges;
+  // Game-specific initial setup
+  brainrotRedLight = false;
+  brainrotRedLightTimer = 0;
+  if (game.id === 'gigachonk') spawnGigaChonk();
+  if (game.id === 'squid') brainrotRedLightTimer = 2000;
+  // Hide squid light when not in squid round
+  const sl = document.getElementById('squid-light');
+  if (sl) sl.classList.toggle('active', game.id === 'squid');
+  root.classList.remove('sq-red');
+  // Banner + chat hype
+  showBrainrotBanner(game);
+  pushChat('> ROUND ' + brainrotGameIdx + ': ' + game.name, '#ffe066');
+  pushChat(game.hint, '#d65cff');
+  if (NEON.audio) NEON.audio.arenaStart();
+}
+function showBrainrotBanner(game) {
+  const el = document.getElementById('brainrot-banner');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="brb-num">ROUND ${String(brainrotGameIdx).padStart(2,'0')}</div>
+    <div class="brb-name">${game.name}</div>
+    <div class="brb-hint">${game.hint}</div>
+  `;
+  el.classList.remove('show'); void el.offsetWidth;
+  el.classList.add('show');
+}
+function spawnGigaChonk() {
+  enemies.push({
+    type: 'gigachonk',
+    x: W / 2, y: -120, vx: 0, vy: 0,
+    speed: 0.6, radius: 90, hp: 24, hpMax: 24,
+    color: '#ff2a6d',
+    score: 5000,
+    isGigaChonk: true,
+  });
+}
+
 function updateBrainrotHud() {
   const hud = document.getElementById('brainrot-hud');
   if (!hud) return;
@@ -567,7 +655,14 @@ function initRun() {
     if (ownedUpgrades['glass_cannon']) player.lives = 1;
   }
 
-  startArena(1);
+  if (brainrotMode) {
+    brainrotGameIdx = 0;
+    brainrotGame = null;
+    startArena(1);
+    startBrainrotRound();
+  } else {
+    startArena(1);
+  }
 }
 
 function startArena(num) {
@@ -641,7 +736,16 @@ function spawnBoss(arenaNum) {
 // ─────────────────────────────────────────────────────
 // INPUT
 // ─────────────────────────────────────────────────────
-function onMouseMove(e) { input.mx = e.clientX; input.my = e.clientY; }
+function onMouseMove(e) {
+  // MIRROR WORLD: flip mouse around the player so aim is inverted
+  if (brainrotMode && brainrotGame && brainrotGame.id === 'inverted' && player) {
+    input.mx = 2 * player.x - e.clientX;
+    input.my = 2 * player.y - e.clientY;
+    return;
+  }
+  input.mx = e.clientX;
+  input.my = e.clientY;
+}
 function onMouseDown(e) {
   if (paused) return;
   if (e.button !== 0) return;
@@ -809,6 +913,24 @@ function pickEnemyType(arenaNum) {
     const pool = arena.wave.pool;
     return pool[Math.floor(Math.random() * pool.length)];
   }
+  // Brainrot mini-game pools
+  if (brainrotMode && brainrotGame) {
+    switch (brainrotGame.id) {
+      case 'swarm':     return 'baby';
+      case 'gigachonk': return 'basic'; // unused, chonk spawned directly
+      case 'bighead':   return Math.random() < 0.5 ? 'basic' : 'tank';
+      case 'speedrun':  return Math.random() < 0.6 ? 'fast' : 'basic';
+      case 'honk':      return Math.random() < 0.5 ? 'basic' : (Math.random() < 0.5 ? 'fast' : 'splitter');
+      case 'gravity':   return Math.random() < 0.7 ? 'basic' : 'fast';
+      case 'duck':      return 'baby';
+      case 'stealth':   return Math.random() < 0.5 ? 'basic' : 'fast';
+      case 'squid':     return 'basic';
+      case 'lava':      return Math.random() < 0.5 ? 'basic' : 'fast';
+      case 'inverted':  return Math.random() < 0.5 ? 'basic' : 'fast';
+      case 'yeet':      return Math.random() < 0.3 ? 'tank' : 'basic';
+      default:          return 'basic';
+    }
+  }
   const r = Math.random();
   if (arenaNum <= 1) return 'basic';
   if (arenaNum <= 2) return r < 0.70 ? 'basic' : 'fast';
@@ -866,16 +988,42 @@ function spawnEnemy(type) {
   e.speed *= 1 + (arena.num - 1) * 0.035; // BALANCE AUDIT 2026-04-18: 3.5% speed increase per arena so each wave is measurably harder
   e.speed *= (stats.globalSpeedMult || 1); // cursed: caffeine overdose
   if (customDef) e.speed *= customDef.rules.enemySpeedMult; // Workshop override
+  // ── Brainrot mini-game mutations ──
+  if (brainrotMode && brainrotGame) {
+    switch (brainrotGame.id) {
+      case 'swarm':    e.radius *= 0.6; e.speed *= 1.25; e.hp = 1; break;
+      case 'bighead':  e.radius *= 1.8; e.speed *= 0.85; e.bigHead = true; break;
+      case 'speedrun': e.speed *= 2.0; break;
+      case 'honk':     e.honk = true; e.hp = 1; break;
+      case 'gravity':  e.speed *= 0.9; e.gravityFollows = true; break;
+      case 'duck':     e.radius *= 0.8; e.quack = true; e.hp = 1; break;
+      case 'stealth':  e.stealth = true; break;
+      case 'squid':    e.squidWatcher = true; break;
+      case 'lava':     e.speed *= 1.15; break;
+      case 'inverted': break;
+      case 'yeet':     break;
+    }
+  }
   enemies.push(e);
 }
 
 function spawnWaveBatch() {
   if (arena.enemyCountRemaining <= 0) return;
-  if (enemies.length >= CFG.MAX_ON_SCREEN) return;
+  // Giga Chonk round: don't spawn anything else
+  if (brainrotMode && brainrotGame && brainrotGame.id === 'gigachonk') return;
+  const cap = brainrotMode && brainrotGame && brainrotGame.id === 'swarm' ? 60 : CFG.MAX_ON_SCREEN;
+  if (enemies.length >= cap) return;
+  let target = 2 + Math.floor(arena.num / 2);
+  if (brainrotMode && brainrotGame) {
+    if (brainrotGame.id === 'swarm')    target = 8;
+    if (brainrotGame.id === 'duck')     target = 5;
+    if (brainrotGame.id === 'speedrun') target = 5;
+    if (brainrotGame.id === 'honk')     target = 5;
+  }
   const batchSize = Math.min(
     arena.enemyCountRemaining,
-    CFG.MAX_ON_SCREEN - enemies.length,
-    2 + Math.floor(arena.num / 2)
+    cap - enemies.length,
+    target
   );
   for (let i = 0; i < batchSize; i++) {
     spawnEnemy(pickEnemyType(arena.num));
@@ -928,9 +1076,59 @@ function update(dt, rawDt) {
   // ─── Arena timing / spawning ───
   arena.timeRemainingMs -= rawDt;
   arena.spawnTimer -= rawDt;
+  // Brainrot spawn cadence varies per mini-game
+  let spawnInterval = 700 - Math.min(400, arena.num * 40);
+  if (brainrotMode && brainrotGame) {
+    if (brainrotGame.id === 'swarm')    spawnInterval = 220;
+    if (brainrotGame.id === 'duck')     spawnInterval = 340;
+    if (brainrotGame.id === 'speedrun') spawnInterval = 380;
+    if (brainrotGame.id === 'honk')     spawnInterval = 320;
+    if (brainrotGame.id === 'gigachonk') spawnInterval = 99999;
+  }
   if (arena.spawnTimer <= 0) {
-    arena.spawnTimer = 700 - Math.min(400, arena.num * 40);
+    arena.spawnTimer = spawnInterval;
     spawnWaveBatch();
+  }
+
+  // ─── Brainrot per-round global effects ───
+  if (brainrotMode && brainrotGame) {
+    // FLOOR IS LAVA: player takes damage outside inner safe ring
+    if (brainrotGame.id === 'lava') {
+      const safeR = Math.min(W, H) * 0.28;
+      const dx = player.x - W/2, dy = player.y - H/2;
+      if (Math.hypot(dx, dy) > safeR && player.iframes <= 0 && !player.dashing) {
+        hitPlayer();
+      }
+    }
+    // GRAVITY WELL: enemies get extra pull toward cursor
+    if (brainrotGame.id === 'gravity') {
+      for (const e of enemies) {
+        const dx = input.mx - e.x, dy = input.my - e.y;
+        const len = Math.hypot(dx, dy) || 1;
+        e.x += (dx / len) * 0.9 * dtScale;
+        e.y += (dy / len) * 0.9 * dtScale;
+      }
+    }
+    // RED LIGHT / GREEN LIGHT: damage the player if they move during red light
+    if (brainrotGame.id === 'squid') {
+      brainrotRedLightTimer -= rawDt;
+      if (brainrotRedLightTimer <= 0) {
+        brainrotRedLight = !brainrotRedLight;
+        brainrotRedLightTimer = brainrotRedLight ? 2500 : 3500;
+        const banner = document.getElementById('squid-light');
+        if (banner) {
+          const label = banner.querySelector('.sl-label');
+          if (label) label.textContent = brainrotRedLight ? 'RED LIGHT' : 'GREEN LIGHT';
+          banner.classList.toggle('active', true);
+          const root = document.getElementById('game-root');
+          if (root) root.classList.toggle('sq-red', brainrotRedLight);
+        }
+      }
+      if (brainrotRedLight && player.iframes <= 0 && !player.dashing) {
+        const moved = Math.abs(player.vx) + Math.abs(player.vy);
+        if (moved > 0.4) hitPlayer();
+      }
+    }
   }
 
   // Dash cooldown / recharge
@@ -976,8 +1174,11 @@ function update(dt, rawDt) {
       player.vx *= Math.pow(CFG.FRICTION, dtScale);
       player.vy *= Math.pow(CFG.FRICTION, dtScale);
     }
-    player.x += player.vx * dtScale;
-    player.y += player.vy * dtScale;
+    // SPEEDRUN game: player moves 2x as fast
+    let pmul = 1;
+    if (brainrotMode && brainrotGame && brainrotGame.id === 'speedrun') pmul = 2.0;
+    player.x += player.vx * dtScale * pmul;
+    player.y += player.vy * dtScale * pmul;
   }
 
   // Clamp to arena circle
@@ -1191,7 +1392,19 @@ function update(dt, rawDt) {
   // Show the wave-clear prompt as soon as all enemies are gone.
   // The player picks the moment to advance rather than waiting on the timer.
   if (!arena.cleared) {
-    if (arena.isBoss) {
+    if (brainrotMode) {
+      // Brainrot: no wave-clear screen, no upgrades. Rotate to next game on
+      // timer expiry, or clear Giga Chonk as a flex win (also rotates).
+      const chonkDown = (brainrotGame && brainrotGame.id === 'gigachonk' && enemies.length === 0 && brainrotGameIdx > 0);
+      if (arena.timeRemainingMs <= 0 || chonkDown) {
+        if (chonkDown) {
+          addScore(5000);
+          spawnDamageNumber(W/2, H/2, 'CHONK DEFEATED +5000', '#ffe066');
+          pushChat('HUGE W', '#ffe066');
+        }
+        startBrainrotRound();
+      }
+    } else if (arena.isBoss) {
       if (enemies.length === 0) showWaveClear();
     } else if (enemies.length === 0 && arena.enemyCountRemaining <= 0) {
       showWaveClear();
@@ -1295,6 +1508,22 @@ function killEnemy(idx, ctxObj) {
   // BRAINROT MODE: full addiction stack — tier rolls, streak, aura, chat
   if (brainrotMode) {
     gained = brainrotOnKill(e, gained);
+    // Mini-game on-kill effects
+    if (brainrotGame) {
+      if (brainrotGame.id === 'yeet') {
+        // Every kill releases a free massive shockwave
+        spawnShockwave(e.x, e.y);
+        triggerShake(8);
+      }
+      if (brainrotGame.id === 'honk') {
+        spawnDamageNumber(e.x, e.y - 30, 'HONK', '#ffff00');
+        // fake clown nose
+        spawnExplosion(e.x, e.y, '#ff2a6d', 14);
+      }
+      if (brainrotGame.id === 'duck') {
+        spawnDamageNumber(e.x, e.y - 30, 'QUACK', '#ffe066');
+      }
+    }
   }
   addScore(gained);
   spawnDamageNumber(e.x, e.y, '+' + gained, comboMult >= 1.5 ? '#ff2a6d' : '#05d9e8');
@@ -1820,10 +2049,43 @@ function drawArena(cx, cy, r) {
 }
 
 function drawEnemy(e) {
+  // GIGA CHONK: huge dramatic boss render
+  if (e.isGigaChonk) {
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.shadowBlur = 40; ctx.shadowColor = e.color;
+    ctx.fillStyle = '#2a0010';
+    ctx.strokeStyle = e.color; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Angry face
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-28, -14, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 28, -14, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-28, -14, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 28, -14, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-32, 25); ctx.lineTo(-10, 18); ctx.lineTo(10, 18); ctx.lineTo(32, 25);
+    ctx.stroke();
+    // HP bar above
+    const pct = e.hp / e.hpMax;
+    ctx.fillStyle = '#330'; ctx.fillRect(-70, -e.radius - 20, 140, 8);
+    ctx.fillStyle = '#ffe066'; ctx.fillRect(-70, -e.radius - 20, 140 * pct, 8);
+    ctx.restore();
+    return;
+  }
+  // Stealth: enemy renders at low alpha while outside a 160px aura of player
+  const stealthHidden = e.stealth && Math.hypot(e.x - player.x, e.y - player.y) > 180;
+  const alphaMul = stealthHidden ? 0.18 : 1;
+  if (alphaMul !== 1) { ctx.save(); ctx.globalAlpha = alphaMul; }
   // Cached static sprites (no rotation needed) — huge perf win vs per-frame shadowBlur
   if (e.type === 'basic' || e.type === 'baby' || e.type === 'splitter') {
     const sp = getEnemySprite(e.type, e.radius, e.color);
     ctx.drawImage(sp.canvas, e.x - sp.half, e.y - sp.half);
+    if (e.bigHead) drawBigHead(e);
+    if (e.honk)    drawClownNose(e);
+    if (e.quack)   drawDuckBill(e);
+    if (alphaMul !== 1) ctx.restore();
     return;
   }
   if (e.type === 'tank') {
@@ -1837,6 +2099,10 @@ function drawEnemy(e) {
       ctx.beginPath(); ctx.arc(-6 + i * 6, 0, 2, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+    if (e.bigHead) drawBigHead(e);
+    if (e.honk)    drawClownNose(e);
+    if (e.quack)   drawDuckBill(e);
+    if (alphaMul !== 1) ctx.restore();
     return;
   }
   ctx.save();
@@ -1920,6 +2186,39 @@ function drawEnemy(e) {
     ctx.fillStyle = '#ff2a6d';
     ctx.beginPath(); ctx.arc(0, 0, e.radius * 0.35, 0, Math.PI*2); ctx.fill();
   }
+  ctx.restore();
+  if (e.bigHead) drawBigHead(e);
+  if (e.honk)    drawClownNose(e);
+  if (e.quack)   drawDuckBill(e);
+  if (alphaMul !== 1) ctx.restore();
+}
+
+function drawBigHead(e) {
+  ctx.save(); ctx.translate(e.x, e.y);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-e.radius * 0.45, -e.radius * 0.35, e.radius * 0.55, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( e.radius * 0.45, -e.radius * 0.35, e.radius * 0.55, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#000';
+  const sx = Math.max(-0.35, Math.min(0.35, (player.x - e.x) * 0.002));
+  const sy = Math.max(-0.35, Math.min(0.35, (player.y - e.y) * 0.002));
+  ctx.beginPath(); ctx.arc(-e.radius * 0.45 + sx * e.radius, -e.radius * 0.35 + sy * e.radius, e.radius * 0.22, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( e.radius * 0.45 + sx * e.radius, -e.radius * 0.35 + sy * e.radius, e.radius * 0.22, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawClownNose(e) {
+  ctx.save(); ctx.translate(e.x, e.y);
+  ctx.fillStyle = '#ff2a6d'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff2a6d';
+  ctx.beginPath(); ctx.arc(0, e.radius * 0.1, e.radius * 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-e.radius * 0.15, e.radius * 0.02, e.radius * 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawDuckBill(e) {
+  ctx.save(); ctx.translate(e.x, e.y + e.radius * 0.35);
+  ctx.fillStyle = '#ffe066'; ctx.shadowBlur = 6; ctx.shadowColor = '#ffe066';
+  ctx.beginPath(); ctx.ellipse(0, 0, e.radius * 0.7, e.radius * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#a67c00'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-e.radius * 0.5, 0); ctx.lineTo(e.radius * 0.5, 0); ctx.stroke();
   ctx.restore();
 }
 

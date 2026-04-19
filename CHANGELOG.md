@@ -3,6 +3,63 @@
 All notable changes to Neon Pulse are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.0] - 2026-04-19 — CRAB PULSE (ROTATING MINI-GAME GAUNTLET)
+
+Massive BRAINROT MODE rebuild. The mode no longer just adds filters; it now mutates the rules of the game every 18 to 26 seconds. Inspired by Crab Game's party rotation and REPO's physics chaos. Twelve mini games, each with distinct enemy behavior, player rules, and win conditions.
+
+### Added
+Twelve rotating mini games (`BRAINROT_GAMES` in `game.js`):
+1. SWARM: 60 tiny babies flood the arena, fast and cheap
+2. GIGA CHONK: one single 90 px boss with 24 HP, round ends when it dies
+3. FLOOR IS LAVA: damage ring around the outer 72 percent of the arena, stay near center
+4. MIRROR WORLD: your mouse is flipped around the player
+5. YEET CANNON: every kill fires an automatic shockwave
+6. BIG HEAD MODE: enemies get huge googly eyes that track the player
+7. DOUBLE TIME: 2x player speed, 2x enemy speed, short round
+8. HONK HONK: clown-nose enemies that drop extra explosions
+9. GRAVITY WELL: enemies are slowly pulled toward the cursor
+10. DUCK SEASON: enemies wear duck bills and quack when killed
+11. LIGHTS OUT: enemies are invisible outside a small aura around the player
+12. RED LIGHT: move during red light and you take damage. Freeze when the eye opens.
+
+Round system (`startBrainrotRound`, `rollNextBrainrotGame`):
+1. Full-screen animated ROUND banner with number, name, and hint
+2. Every round rolls a different game than the previous one (no immediate repeats)
+3. Round ends on timer expiry, or on Giga Chonk kill (5000 point flex bonus)
+4. Enemies explode dramatically when the round rotates
+
+Per-game visual tints on the canvas via `brg-<id>` CSS classes.
+
+RED LIGHT / GREEN LIGHT indicator banner with a pulsing eye, red-canvas tint during red light.
+
+FLOOR IS LAVA border glow with inset shadow pulse animation.
+
+### Changed
+`initRun()` now branches on `brainrotMode` and calls `startBrainrotRound()` after `startArena(1)` to boot the first mini game.
+
+Arena clear logic in brainrot mode: no wave-clear screen, no upgrades. Instead the timer or boss death triggers the next mini-game rotation.
+
+`pickEnemyType()` picks per-game enemy pools: swarm spawns only babies, duck spawns fast + baby mix, honk spawns splitters, etc.
+
+`spawnEnemy()` applies per-game mutations as flags on the enemy object: `bigHead`, `honk`, `quack`, `stealth`, `gravityFollows`, `isGigaChonk`.
+
+`drawEnemy()` renders those mutations: googly eyes that track the player, clown noses, duck bills, low-alpha stealth outside player aura, and a full boss render for Giga Chonk with an angry face and an HP bar.
+
+`spawnWaveBatch()` uses per-game caps and batch sizes (60 swarm cap, 8 swarm batch, spawner disabled during GIGA CHONK).
+
+`killEnemy()` brainrot branch triggers YEET auto-shockwaves, HONK extra explosions, and DUCK "QUACK" callouts.
+
+`update()` global effects: FLOOR IS LAVA border damage when the player leaves the center 28 percent, GRAVITY WELL pulling enemies toward the cursor at 0.9 * dtScale, and RED LIGHT/GREEN LIGHT damage gating.
+
+Player move speed doubled during DOUBLE TIME.
+
+Mouse input flipped around the player during MIRROR WORLD.
+
+### Notes
+All twelve games share the same core arena loop; only the rules flip. This keeps the mode cheap to extend: a new mini game is a new entry in `BRAINROT_GAMES` plus a handful of switch cases.
+
+The v0.4.2 addiction stack (aura, jackpots, streaks, fake chat, run-it-back, daily streak) remains on top. A 5-minute brainrot run now contains roughly 15 distinct rule changes.
+
 ## [0.4.2] - 2026-04-19 — BRAINROT ADDICTION STACK
 
 Complete psychological engineering layer on top of BRAINROT MODE. Every known retention mechanic in a single mode.

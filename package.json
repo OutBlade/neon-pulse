@@ -1,6 +1,6 @@
 {
   "name": "neon-pulse",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "A precision dash roguelike set in a neon-drenched void.",
   "main": "main.js",
   "author": "OutBlade",
