@@ -187,6 +187,10 @@ let runMeta;    // { startTime, score, kills, dashes, maxCombo, upgradesPicked }
 
 let lastTime = 0;
 
+// Custom arena (Workshop / Forge). When non-null, startArena() reads wave
+// config from customDef.waves[num-1] instead of the procedural generator.
+let customDef = null;
+
 // Floating damage/score numbers
 let damageNumbers = [];
 // Hit-freeze countdown (ms) — briefly pauses time on kills for impact
@@ -196,6 +200,15 @@ let hitFreezeMs = 0;
 // START / STOP
 // ─────────────────────────────────────────────────────
 function start(opts) {
+  customDef = null;
+  _boot(opts);
+}
+// Entry point for Workshop arenas. opts.arena is the validated arenaDef.
+function startCustom(opts) {
+  customDef = opts.arena || null;
+  _boot(opts);
+}
+function _boot(opts) {
   onExit = opts.onExit || (() => {});
   canvas = document.getElementById('game-canvas');
   ctx = canvas.getContext('2d');
@@ -304,10 +317,49 @@ function initRun() {
     upgradesPicked: 0,
   };
 
+  // ─── Custom arena (Workshop) rule overrides ───
+  if (customDef) {
+    player.lives = customDef.rules.lives;
+    // Apply starting upgrades — each id is looked up in the UPGRADES table
+    for (const id of (customDef.rules.startingUpgrades || [])) {
+      const u = UPGRADES.find(x => x.id === id);
+      if (u) { u.apply(stats); ownedUpgrades[id] = (ownedUpgrades[id] || 0) + 1; }
+    }
+    if (ownedUpgrades['big_mode']) player.radius = CFG.PLAYER_RADIUS * stats.playerSizeMult;
+    if (ownedUpgrades['glass_cannon']) player.lives = 1;
+  }
+
   startArena(1);
 }
 
 function startArena(num) {
+  // ── Custom arena: pull from customDef.waves ──
+  if (customDef) {
+    const waveIdx = num - 1;
+    if (waveIdx >= customDef.waves.length) {
+      arenaComplete();
+      return;
+    }
+    const w = customDef.waves[waveIdx];
+    arena = {
+      num,
+      isBoss: !!w.boss,
+      timeRemainingMs: w.duration * 1000,
+      spawnTimer: 0,
+      enemyCountRemaining: w.boss ? 0 : w.count,
+      kills: 0,
+      tookDamage: false,
+      cleared: false,
+      wave: w,
+    };
+    input.dashCharges = stats.maxCharges;
+    if (w.boss) spawnBoss(num);
+    showArenaAnnounce(num);
+    updateHUD();
+    updateModifierBar();
+    if (NEON.audio) NEON.audio.arenaStart();
+    return;
+  }
   const isBoss = num % 5 === 0;
   const count = isBoss ? 0 : CFG.ARENA_ENEMY_BASE + (num - 1) * CFG.ARENA_ENEMY_SCALE;
   arena = {
@@ -514,6 +566,11 @@ function retryRun() {
 // SPAWNING
 // ─────────────────────────────────────────────────────
 function pickEnemyType(arenaNum) {
+  // Custom arena: pool is dictated by the current wave
+  if (customDef && arena && arena.wave && arena.wave.pool && arena.wave.pool.length) {
+    const pool = arena.wave.pool;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
   const r = Math.random();
   if (arenaNum <= 1) return 'basic';
   if (arenaNum <= 2) return r < 0.70 ? 'basic' : 'fast';
@@ -570,6 +627,7 @@ function spawnEnemy(type) {
   }
   e.speed *= 1 + (arena.num - 1) * 0.035; // BALANCE AUDIT 2026-04-18: 3.5% speed increase per arena so each wave is measurably harder
   e.speed *= (stats.globalSpeedMult || 1); // cursed: caffeine overdose
+  if (customDef) e.speed *= customDef.rules.enemySpeedMult; // Workshop override
   enemies.push(e);
 }
 
@@ -1030,6 +1088,7 @@ function setCombo(v) {
 }
 
 function addScore(n) {
+  if (customDef) n = Math.round(n * customDef.rules.scoreMult);
   runMeta.score += n;
 }
 
@@ -1119,6 +1178,36 @@ function pickUpgrade(u) {
 }
 
 // ─────────────────────────────────────────────────────
+// ARENA COMPLETE (custom arenas only — ran out of waves)
+// ─────────────────────────────────────────────────────
+function arenaComplete() {
+  running = false;
+  const playtimeSec = Math.round((performance.now() - runMeta.startTime) / 1000);
+  const waveCount = customDef ? customDef.waves.length : arena.num;
+  const newBest = customDef
+    ? NEON.storage.recordArenaRun(customDef.id, { score: runMeta.score, wave: waveCount })
+    : false;
+  document.getElementById('go-score').textContent = runMeta.score.toLocaleString();
+  document.getElementById('go-arena').textContent = waveCount;
+  document.getElementById('go-combo').textContent = 'x' + runMeta.maxCombo;
+  document.getElementById('go-kills').textContent = runMeta.kills;
+  document.getElementById('go-new-best').classList.toggle('show', newBest);
+  const titleEl = document.querySelector('#gameover-screen .go-title');
+  if (titleEl) titleEl.textContent = 'ARENA COMPLETE';
+  let quoteEl = document.getElementById('go-quote');
+  if (!quoteEl) {
+    quoteEl = document.createElement('div');
+    quoteEl.id = 'go-quote';
+    const goScreen = document.getElementById('gameover-screen');
+    goScreen.insertBefore(quoteEl, goScreen.querySelector('.go-stats'));
+  }
+  quoteEl.textContent = customDef ? `"${customDef.name}" cleared.` : '';
+  setTimeout(() => {
+    document.getElementById('gameover-screen').classList.add('show');
+  }, 450);
+}
+
+// ─────────────────────────────────────────────────────
 // GAME OVER
 // ─────────────────────────────────────────────────────
 function gameOver() {
@@ -1134,6 +1223,12 @@ function gameOver() {
     arena: arena.num,
     playtimeSec,
   });
+  // Record to Workshop scoreboard if this was a custom arena
+  if (customDef) {
+    NEON.storage.recordArenaRun(customDef.id, { score: runMeta.score, wave: arena.num });
+  }
+  const titleEl = document.querySelector('#gameover-screen .go-title');
+  if (titleEl) titleEl.textContent = 'OFFLINE';
 
   NEON.achievements.checkOnRunEnd({
     score: runMeta.score,
@@ -1864,6 +1959,6 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ─────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────
-window.NeonPulseGame = { start, buildSummaryCard: () => buildSummaryCard() };
+window.NeonPulseGame = { start, startCustom, buildSummaryCard: () => buildSummaryCard() };
 
 })();

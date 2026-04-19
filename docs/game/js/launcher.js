@@ -107,6 +107,10 @@
     audio.stopAmbient();
     startGame();
   });
+  document.getElementById('btn-workshop').addEventListener('click', () => {
+    audio.menuSelect();
+    openWorkshop();
+  });
   document.getElementById('btn-settings').addEventListener('click', () => {
     audio.menuSelect();
     refreshSettings();
@@ -308,6 +312,43 @@
       }, 1000);
     });
   }
+
+  // ─── Workshop (UGC) ───────────────────────
+  function openWorkshop() {
+    if (!window.NeonForge) return;
+    window.NeonForge.renderWorkshop(storage, startCustomArena);
+    showScreen('screen-workshop');
+  }
+  function startCustomArena(arenaDef) {
+    audio.menuSelect();
+    audio.stopAmbient();
+    document.getElementById('launcher-root').style.display = 'none';
+    document.getElementById('game-root').style.display = 'block';
+    audio.unlock();
+    NeonPulseGame.startCustom({
+      arena: arenaDef,
+      onExit: () => {
+        document.getElementById('game-root').style.display = 'none';
+        document.getElementById('launcher-root').style.display = 'block';
+        audio.startAmbient();
+        refreshStats();
+        refreshAchievements();
+        refreshMenuHint();
+        // Return to workshop if that's where we came from
+        openWorkshop();
+      },
+    });
+  }
+  const wsNew = document.getElementById('ws-new');
+  if (wsNew) wsNew.addEventListener('click', () => {
+    if (!window.NeonForge) return;
+    window.NeonForge.openForge(null, storage, () => openWorkshop());
+  });
+  const wsPaste = document.getElementById('ws-paste');
+  if (wsPaste) wsPaste.addEventListener('click', () => {
+    if (!window.NeonForge) return;
+    window.NeonForge.openImportDialog(storage, () => openWorkshop());
+  });
 
   // ─── Start game ───────────────────────────
   function startGame() {

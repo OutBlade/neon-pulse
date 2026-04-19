@@ -23,6 +23,8 @@ const DEFAULTS = {
     totalPlaytimeSec: 0,
   },
   achievements: {},  // id → true
+  customArenas: {},  // id → arenaDef (see src/js/forge.js for schema)
+  arenaScores:  {},  // arenaId → { bestScore, bestWave, runs }
 };
 
 function deepMerge(a, b) {
@@ -100,6 +102,37 @@ class Storage {
   resetAll() {
     this.state = structuredClone(DEFAULTS);
     this.save();
+  }
+
+  // ── Custom arenas (Workshop / Forge) ────────
+  get customArenas() { return this.state.customArenas || {}; }
+  saveCustomArena(def) {
+    if (!def || !def.id) return false;
+    this.state.customArenas[def.id] = def;
+    this.save();
+    return true;
+  }
+  deleteCustomArena(id) {
+    if (this.state.customArenas[id]) {
+      delete this.state.customArenas[id];
+      this.save();
+      return true;
+    }
+    return false;
+  }
+  recordArenaRun(arenaId, runResult) {
+    if (!arenaId) return false;
+    const rec = this.state.arenaScores[arenaId] || { bestScore: 0, bestWave: 0, runs: 0 };
+    rec.runs += 1;
+    let newBest = false;
+    if (runResult.score > rec.bestScore) { rec.bestScore = runResult.score; newBest = true; }
+    if (runResult.wave > rec.bestWave)   { rec.bestWave  = runResult.wave; }
+    this.state.arenaScores[arenaId] = rec;
+    this.save();
+    return newBest;
+  }
+  getArenaScore(arenaId) {
+    return this.state.arenaScores[arenaId] || { bestScore: 0, bestWave: 0, runs: 0 };
   }
 }
 

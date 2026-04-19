@@ -35,6 +35,7 @@
       <div class="menu-layout">
         <nav class="menu">
           <button class="menu-btn primary" id="btn-play">PLAY</button>
+          <button class="menu-btn"         id="btn-workshop">WORKSHOP</button>
           <button class="menu-btn"         id="btn-settings">SETTINGS</button>
           <button class="menu-btn"         id="btn-stats">STATS</button>
           <button class="menu-btn"         id="btn-achievements">ACHIEVEMENTS</button>
@@ -44,18 +45,17 @@
         <aside class="news-pane" id="news-pane">
           <div class="news-head">
             <span class="news-label">PATCH NOTES</span>
-            <span class="news-version" id="news-version">v0.3.0</span>
+            <span class="news-version" id="news-version">v0.4.0</span>
           </div>
           <div class="news-body" id="news-body">
             <div class="news-entry">
-              <div class="news-entry-title">THE VIRAL UPDATE</div>
+              <div class="news-entry-title">THE WORKSHOP UPDATE</div>
               <ul>
-                <li>NEW: CURSED upgrade tier. Glass Cannon. Gambler. All Gas No Brakes.</li>
-                <li>NEW: Kill callouts. Rack up a dash-chain for POLYGON ANNIHILATION.</li>
-                <li>NEW: Shareable run-summary PNG card. Posting it is the whole point.</li>
-                <li>NEW: Death cam with rotating last-words. Clip it.</li>
-                <li>PERF: Enemy sprite caching + arena bake-off. Up to 40% fewer draw ops.</li>
-                <li>OPT: FPS cap (30/60/120/144/uncapped) in Settings for weaker rigs.</li>
+                <li>NEW: WORKSHOP. Build your own arenas. Share them via one-line codes.</li>
+                <li>NEW: ARENA FORGE editor. Waves, pools, lives, score mults, bosses.</li>
+                <li>NEW: 3 curated featured arenas. BULLET HELL, THE BLENDER, SPEEDRUN ANY%.</li>
+                <li>NEW: Per-arena scoreboards. Every creation tracks its own best.</li>
+                <li>PREV: CURSED upgrades, kill callouts, shareable PNG cards still here.</li>
               </ul>
             </div>
           </div>
@@ -192,6 +192,37 @@
         <div id="ach-list"></div>
         <div class="panel-footer">
           <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Workshop -->
+    <section class="screen" id="screen-workshop">
+      <div class="panel">
+        <h2>WORKSHOP <span style="color:var(--accent);font-size:13px;letter-spacing:0.3em">· COMMUNITY ARENAS</span></h2>
+        <div class="ws-toolbar">
+          <button class="btn-ghost" id="ws-new">+ NEW ARENA</button>
+          <button class="btn-ghost" id="ws-paste">PASTE CODE</button>
+        </div>
+        <div class="ws-section-label">FEATURED</div>
+        <div class="ws-list" id="ws-featured-list"></div>
+        <div class="ws-section-label">YOUR ARENAS &amp; IMPORTS</div>
+        <div class="ws-list" id="ws-user-list"></div>
+        <div class="panel-footer">
+          <button class="btn-ghost" data-back>BACK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Forge editor -->
+    <section class="screen" id="screen-forge">
+      <div class="panel">
+        <h2>ARENA FORGE <span style="color:var(--cyan);font-size:13px;letter-spacing:0.3em">· DESIGN YOUR NIGHTMARE</span></h2>
+        <div id="forge-body"></div>
+        <div class="panel-footer">
+          <button class="btn-ghost" id="forge-cancel">CANCEL</button>
+          <button class="btn-ghost" id="forge-share">COPY SHARE CODE</button>
+          <button class="btn-ghost primary" id="forge-save">SAVE ARENA</button>
         </div>
       </div>
     </section>
@@ -335,6 +366,7 @@
 <script src="js/audio.js"></script>
 <script src="js/achievements.js"></script>
 <script src="js/game.js"></script>
+<script src="js/forge.js"></script>
 <script src="js/launcher.js"></script>
 
 </body>

@@ -3,6 +3,26 @@
 All notable changes to Neon Pulse are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.0] - 2026-04-19 — THE WORKSHOP UPDATE
+
+### Added
+- **WORKSHOP** menu button leading to a community-arena browser (`src/index.html`, `src/js/launcher.js`). Browse featured arenas, your own creations, and arenas imported from share codes. Each card shows wave count, lives, score multiplier, and your personal best.
+- **ARENA FORGE** in-game editor (`src/js/forge.js`): design fully custom challenges. Set name, author, description, lives (1-5), enemy-speed multiplier (0.5x-2.5x), score multiplier (0.5x-3.0x), and up to 10 waves. Each wave configures duration, spawn count, enemy-type pool (basic / fast / tank / shooter / splitter), and an optional BOSS flag.
+- **Share codes** (`NP1:` prefix + URL-safe base64): one-line portable strings. Post them on Discord / Reddit / Twitter and anyone can paste to import, play, and post their high score. Deterministic id derived from the code so leaderboards converge across users.
+- **Featured starter arenas** (hand-curated by OutBlade): *BULLET HELL* (shooters-only gauntlet ending in a boss), *THE BLENDER* (splitter soup for guaranteed multi-kills), *SPEEDRUN ANY%* (everything +60% speed, score x3).
+- **Per-arena scoreboards** in `storage.js` (`recordArenaRun` / `getArenaScore`): best score and best wave are tracked per arena id so each workshop creation has its own leaderboard.
+- New game entry point `NeonPulseGame.startCustom({ arena, onExit })` that overrides wave spawning, enemy speeds, starting upgrades, lives, and score multipliers — respecting all the Forge rule knobs.
+- `ARENA COMPLETE` summary screen (reuses gameover panel) shown when the final custom wave is cleared.
+
+### Changed
+- `storage.js` schema extended with `customArenas` and `arenaScores` maps. Existing saves deep-merge with defaults so upgrading is non-breaking.
+- `index.html` includes `<script src="js/forge.js">` and two new screen sections (`#screen-workshop`, `#screen-forge`).
+- `launcher.css` gains a full suite of Workshop / Forge styles (arena cards, forge rows, wave rows, enemy-pool chips).
+
+### Notes
+- Schema is versioned (`v: 1`). Future additions can extend the object without breaking existing share codes.
+- Defensive validation (`validate()` in `forge.js`) clamps every imported field so malicious or malformed codes can't crash the game.
+
 ## [0.3.1] - 2026-04-18 — AGGRESSIVE AUTO-UPDATE
 
 ### Changed
