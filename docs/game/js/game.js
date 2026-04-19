@@ -191,6 +191,34 @@ let lastTime = 0;
 // config from customDef.waves[num-1] instead of the procedural generator.
 let customDef = null;
 
+// ─── BRAINROT MODE ──────────────────────────────────
+// Pure meme overlay: random internet-cursed labels on every kill,
+// surprise score multipliers, rainbow filter, mild camera tilt.
+// Doesn't change physics — only vibes. Fully togglable.
+let brainrotMode = false;
+const BRAINROT_WORDS = [
+  'SKIBIDI', 'OHIO', 'GYATT', 'RIZZ', 'SIGMA', 'GOON', 'FANUM TAX',
+  'MEWING', 'L + RATIO', 'CERTIFIED W', 'GRIMACE SHAKE', 'SUS',
+  'NO CAP', 'BUSSIN', 'DELULU', 'NPC MOMENT', 'CRASH OUT',
+  'TUNG TUNG', 'TRALALERO', 'BRR BRR PATAPIM', 'YEET',
+  'BASED', 'BRAINROT', 'MID', 'HE\'S COOKING', 'LOW TAPER FADE',
+  'ICK', 'AURA +500', 'AURA -9999', 'CHAT IS THIS REAL',
+  'PMO', 'SYBAU', 'GYATDAMN', 'ZESTY',
+];
+const BRAINROT_BONUSES = [
+  { label: 'OHIO BONUS',    mult: 1.5 },
+  { label: 'RIZZ OVERLOAD', mult: 2.0 },
+  { label: 'SIGMA GRINDSET', mult: 1.75 },
+  { label: 'SKIBIDI SURGE',  mult: 3.0 },
+  { label: 'CERTIFIED W',    mult: 1.25 },
+  { label: 'GYATT JACKPOT',  mult: 2.5 },
+];
+function pickBrainrotWord() { return BRAINROT_WORDS[Math.floor(Math.random() * BRAINROT_WORDS.length)]; }
+function pickBrainrotColor() {
+  const h = Math.floor(Math.random() * 360);
+  return `hsl(${h}, 100%, 65%)`;
+}
+
 // Floating damage/score numbers
 let damageNumbers = [];
 // Hit-freeze countdown (ms) — briefly pauses time on kills for impact
@@ -201,11 +229,22 @@ let hitFreezeMs = 0;
 // ─────────────────────────────────────────────────────
 function start(opts) {
   customDef = null;
+  brainrotMode = false;
+  document.getElementById('game-root').classList.remove('brainrot');
   _boot(opts);
 }
 // Entry point for Workshop arenas. opts.arena is the validated arenaDef.
 function startCustom(opts) {
   customDef = opts.arena || null;
+  brainrotMode = false;
+  document.getElementById('game-root').classList.remove('brainrot');
+  _boot(opts);
+}
+// BRAINROT MODE — the standard arena loop wrapped in pure internet poison
+function startBrainrot(opts) {
+  customDef = null;
+  brainrotMode = true;
+  document.getElementById('game-root').classList.add('brainrot');
   _boot(opts);
 }
 function _boot(opts) {
@@ -229,6 +268,8 @@ function stop(goToMenu) {
   running = false;
   unbindInputs();
   window.removeEventListener('resize', resize);
+  document.getElementById('game-root').classList.remove('brainrot');
+  brainrotMode = false;
   const cb = onExit; onExit = null;
   if (cb) cb();
 }
@@ -1040,8 +1081,18 @@ function killEnemy(idx, ctxObj) {
     gained = Math.max(0, gained + swing);
     spawnDamageNumber(e.x, e.y - 14, (swing >= 0 ? '+' : '') + swing, swing > 0 ? '#ffff66' : '#ff2a6d');
   }
+  // BRAINROT MODE: surprise bonus multiplier on ~12% of kills
+  if (brainrotMode && Math.random() < 0.12) {
+    const bonus = BRAINROT_BONUSES[Math.floor(Math.random() * BRAINROT_BONUSES.length)];
+    gained = Math.floor(gained * bonus.mult);
+    spawnDamageNumber(e.x, e.y - 30, bonus.label + ' x' + bonus.mult, pickBrainrotColor());
+  }
   addScore(gained);
   spawnDamageNumber(e.x, e.y, '+' + gained, comboMult >= 1.5 ? '#ff2a6d' : '#05d9e8');
+  // BRAINROT MODE: random meme word pops up above every dead enemy
+  if (brainrotMode) {
+    spawnDamageNumber(e.x + (Math.random() - 0.5) * 20, e.y - 18, pickBrainrotWord(), pickBrainrotColor());
+  }
 
   // Hit-freeze pulse — scales with combo for that satisfying heavy-hit feel
   if (combo.value >= 3 || e.type === 'tank' || e.type === 'boss') {
@@ -1959,6 +2010,6 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 // ─────────────────────────────────────────────────────
 // Export
 // ─────────────────────────────────────────────────────
-window.NeonPulseGame = { start, startCustom, buildSummaryCard: () => buildSummaryCard() };
+window.NeonPulseGame = { start, startCustom, startBrainrot, buildSummaryCard: () => buildSummaryCard() };
 
 })();

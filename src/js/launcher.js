@@ -107,6 +107,23 @@
     audio.stopAmbient();
     startGame();
   });
+  document.getElementById('btn-brainrot').addEventListener('click', () => {
+    audio.menuSelect();
+    audio.stopAmbient();
+    document.getElementById('launcher-root').style.display = 'none';
+    document.getElementById('game-root').style.display = 'block';
+    audio.unlock();
+    NeonPulseGame.startBrainrot({
+      onExit: () => {
+        document.getElementById('game-root').style.display = 'none';
+        document.getElementById('launcher-root').style.display = 'block';
+        audio.startAmbient();
+        refreshStats();
+        refreshAchievements();
+        refreshMenuHint();
+      },
+    });
+  });
   document.getElementById('btn-workshop').addEventListener('click', () => {
     audio.menuSelect();
     openWorkshop();

@@ -898,3 +898,29 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(5, 217, 232, 0.15);
   box-shadow: 0 0 16px rgba(5, 217, 232, 0.45);
 }
+
+/* BRAINROT menu button — cursed rainbow vibes */
+.menu-btn.brainrot-btn {
+  background: linear-gradient(90deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+  background-size: 300% 100%;
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  border: 1px solid #fff;
+  animation: brmenu-shift 3s linear infinite, brmenu-wobble 4s ease-in-out infinite;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 14px rgba(255, 0, 255, 0.45);
+}
+.menu-btn.brainrot-btn:hover {
+  filter: brightness(1.15);
+  transform: scale(1.03);
+}
+@keyframes brmenu-shift {
+  0%   { background-position: 0%   50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes brmenu-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(1.5deg); }
+  75%      { transform: rotate(-1.5deg); }
+}

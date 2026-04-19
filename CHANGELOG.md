@@ -3,6 +3,20 @@
 All notable changes to Neon Pulse are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.1] - 2026-04-19 — BRAINROT MODE
+
+### Added
+- **BRAINROT MODE** button on the main menu. Boots the arena loop with:
+  - a rotating pool of 30+ internet-cursed labels (SKIBIDI, OHIO, GYATT, RIZZ, TUNG TUNG, FANUM TAX, CERTIFIED W, AURA +500, L + RATIO, etc.) that float above every enemy death in a different random color each time
+  - a 12% chance per kill to trigger a surprise score multiplier (OHIO BONUS x1.5, SKIBIDI SURGE x3.0, GYATT JACKPOT x2.5, and more)
+  - a rainbow hue-rotate filter that slowly cycles through the spectrum on the game canvas and HUD
+  - a gentle wobble/tilt animation on the whole playfield for that drunk-TikTok-filter feel
+  - a cursed-rainbow menu button that shifts colors and wobbles on its own
+- `game.js` exports `NeonPulseGame.startBrainrot({ onExit })` as a third entry point alongside `start` and `startCustom`.
+
+### Notes
+- BRAINROT MODE is pure vibes — it doesn't change physics, score tables, or enemy behavior aside from the bonus multipliers. Scores recorded in it still count toward the standard leaderboard.
+
 ## [0.4.0] - 2026-04-19 — THE WORKSHOP UPDATE
 
 ### Added
